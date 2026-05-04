@@ -63,6 +63,17 @@ import android.widget.Toast;
 import android.os.Build;
 import android.Manifest;
 
+import androidx.work.Data;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkInfo;
+import androidx.work.WorkManager;
+import net.micode.notes.tool.BatchDeleteWorker;
+import net.micode.notes.tool.ExportTextWorker;
+
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
+
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
@@ -121,6 +132,9 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     private ContentResolver mContentResolver;
 
     private ModeCallback mModeCallBack;
+
+    private LiveData<WorkInfo> mExportWorkInfoLiveData;
+    private Observer<WorkInfo> mExportObserver;
 
     private static final String TAG = "NotesListActivity";
 
@@ -481,40 +495,19 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     }
 
     private void batchDelete() {
-        new AsyncTask<Void, Void, HashSet<AppWidgetAttribute>>() {
-            protected HashSet<AppWidgetAttribute> doInBackground(Void... unused) {
-                HashSet<AppWidgetAttribute> widgets = mNotesListAdapter.getSelectedWidget();
-                if (!isSyncMode()) {
-                    // if not synced, delete notes directly
-                    if (DataUtils.batchDeleteNotes(mContentResolver, mNotesListAdapter
-                            .getSelectedItemIds())) {
-                    } else {
-                        Log.e(TAG, "Delete notes error, should not happens");
-                    }
-                } else {
-                    // in sync mode, we'll move the deleted note into the trash
-                    // folder
-                    if (!DataUtils.batchMoveToFolder(mContentResolver, mNotesListAdapter
-                            .getSelectedItemIds(), Notes.ID_TRASH_FOLER)) {
-                        Log.e(TAG, "Move notes to trash folder error, should not happens");
-                    }
-                }
-                return widgets;
-            }
+        long[] itemIds = mNotesListAdapter.getSelectedItemIds()
+                .stream().mapToLong(Long::longValue).toArray();
 
-            @Override
-            protected void onPostExecute(HashSet<AppWidgetAttribute> widgets) {
-                if (widgets != null) {
-                    for (AppWidgetAttribute widget : widgets) {
-                        if (widget.widgetId != AppWidgetManager.INVALID_APPWIDGET_ID
-                                && widget.widgetType != Notes.TYPE_WIDGET_INVALIDE) {
-                            updateWidget(widget.widgetId, widget.widgetType);
-                        }
-                    }
-                }
-                mModeCallBack.finishActionMode();
-            }
-        }.execute();
+        Data inputData = new Data.Builder()
+                .putLongArray(BatchDeleteWorker.KEY_ITEM_IDS, itemIds)
+                .build();
+
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(BatchDeleteWorker.class)
+                .setInputData(inputData)
+                .build();
+
+        WorkManager.getInstance(this).enqueue(request);
+        mModeCallBack.finishActionMode();   // 立即退出多选模式
     }
 
     private void deleteFolder(long folderId) {
@@ -835,46 +828,46 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         return true;
     }
 
+    private void showExportSuccessDialog() {
+    BackupUtils backup = BackupUtils.getInstance(this);
+    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+    builder.setTitle(getString(R.string.success_sdcard_export));
+    builder.setMessage(getString(R.string.format_exported_file_location,
+            backup.getExportedTextFileName(), backup.getExportedTextFileDir()));
+    builder.setPositiveButton(android.R.string.ok, null);
+    builder.show();
+    }
+
+    private void showExportErrorDialog() {
+        BackupUtils backup = BackupUtils.getInstance(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(getString(R.string.failed_sdcard_export));
+        builder.setMessage(getString(R.string.error_sdcard_export));
+        builder.setPositiveButton(android.R.string.ok, null);
+        builder.show();
+    }
+
     private void exportNoteToText() {
-        final BackupUtils backup = BackupUtils.getInstance(NotesListActivity.this);
-        new AsyncTask<Void, Void, Integer>() {
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(ExportTextWorker.class).build();
+        WorkManager.getInstance(this).enqueue(request);
+        mExportWorkInfoLiveData = WorkManager.getInstance(this)
+                .getWorkInfoByIdLiveData(request.getId());
 
-            @Override
-            protected Integer doInBackground(Void... unused) {
-                return backup.exportToText();
-            }
-
-            @Override
-            protected void onPostExecute(Integer result) {
-                if (result == BackupUtils.STATE_SD_CARD_UNMOUONTED) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
-                    builder.setTitle(NotesListActivity.this
-                            .getString(R.string.failed_sdcard_export));
-                    builder.setMessage(NotesListActivity.this
-                            .getString(R.string.error_sdcard_unmounted));
-                    builder.setPositiveButton(android.R.string.ok, null);
-                    builder.show();
-                } else if (result == BackupUtils.STATE_SUCCESS) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
-                    builder.setTitle(NotesListActivity.this
-                            .getString(R.string.success_sdcard_export));
-                    builder.setMessage(NotesListActivity.this.getString(
-                            R.string.format_exported_file_location, backup
-                                    .getExportedTextFileName(), backup.getExportedTextFileDir()));
-                    builder.setPositiveButton(android.R.string.ok, null);
-                    builder.show();
-                } else if (result == BackupUtils.STATE_SYSTEM_ERROR) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
-                    builder.setTitle(NotesListActivity.this
-                            .getString(R.string.failed_sdcard_export));
-                    builder.setMessage(NotesListActivity.this
-                            .getString(R.string.error_sdcard_export));
-                    builder.setPositiveButton(android.R.string.ok, null);
-                    builder.show();
+        if (mExportObserver == null) {
+            mExportObserver = workInfo -> {
+                if (workInfo != null && workInfo.getState().isFinished()) {
+                    if (workInfo.getState() == WorkInfo.State.SUCCEEDED) {
+                        showExportSuccessDialog();
+                    } else {
+                        showExportErrorDialog();
+                    }
+                    if (mExportWorkInfoLiveData != null) {
+                        mExportWorkInfoLiveData.removeObserver(mExportObserver);
+                    }
                 }
-            }
-
-        }.execute();
+            };
+        }
+        mExportWorkInfoLiveData.observeForever(mExportObserver);
     }
 
     private boolean isSyncMode() {
@@ -962,5 +955,13 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
             }
         }
         return true;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mExportWorkInfoLiveData != null) {
+            mExportWorkInfoLiveData.removeObserver(mExportObserver);
+        }
     }
 }

@@ -23,6 +23,12 @@ import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.util.Log;
 
+import android.provider.MediaStore;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import android.content.ContentValues;
+import android.net.Uri;
+
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.DataColumns;
@@ -70,7 +76,8 @@ public class BackupUtils {
     }
 
     private static boolean externalStorageAvailable() {
-        return Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
+        // return Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
+        return true;
     }
 
     public int exportToText() {
@@ -282,62 +289,71 @@ public class BackupUtils {
             return STATE_SUCCESS;
         }
 
-        /**
-         * Get a print stream pointed to the file {@generateExportedTextFile}
-         */
-        private PrintStream getExportToTextPrintStream() {
-            File file = generateFileMountedOnSDcard(mContext, R.string.file_path,
-                    R.string.file_name_txt_format);
-            if (file == null) {
-                Log.e(TAG, "create file to exported failed");
-                return null;
+       private PrintStream getExportToTextPrintStream() {
+            // 生成文件名
+            mFileName = mContext.getString(
+                    R.string.file_name_txt_format,
+                    DateFormat.format(mContext.getString(R.string.format_date_ymd),
+                            System.currentTimeMillis()));
+
+            final String RELATIVE_PATH = "Download/Notes";
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Downloads.DISPLAY_NAME, mFileName);
+                values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
+                values.put(MediaStore.Downloads.RELATIVE_PATH, RELATIVE_PATH);
+
+                try {
+                    Uri uri = mContext.getContentResolver().insert(
+                            MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (uri == null) {
+                        Log.e(TAG, "MediaStore insert returned null");
+                        return null;
+                    }
+                    mFileDirectory = Environment.getExternalStoragePublicDirectory(
+                            Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()
+                            + File.separator + "Notes";
+                    OutputStream os = mContext.getContentResolver().openOutputStream(uri);
+                    if (os == null) {
+                        Log.e(TAG, "Failed to open OutputStream for URI: " + uri);
+                        return null;
+                    }
+                    return new PrintStream(os);
+                } catch (SecurityException e) {
+                    Log.e(TAG, "Permission denied writing to MediaStore", e);
+                    return null;
+                } catch (IOException e) {
+                    Log.e(TAG, "IO error creating file in MediaStore", e);
+                    return null;
+                }
+            } else {
+                if (!externalStorageAvailable()) {
+                    Log.d(TAG, "External storage not available");
+                    return null;
+                }
+                try {
+                    File dir = new File(Environment.getExternalStorageDirectory(),
+                            RELATIVE_PATH);
+                    if (!dir.exists()) {
+                        if (!dir.mkdirs()) {
+                            Log.e(TAG, "Failed to create directory: " + dir.getAbsolutePath());
+                            return null;
+                        }
+                    }
+                    File file = new File(dir, mFileName);
+                    mFileDirectory = dir.getAbsolutePath();
+                    FileOutputStream fos = new FileOutputStream(file);
+                    return new PrintStream(fos);
+                } catch (SecurityException e) {
+                    Log.e(TAG, "Permission denied writing to external storage", e);
+                    return null;
+                } catch (IOException e) {
+                    Log.e(TAG, "IO error creating file on external storage", e);
+                    return null;
+                }
             }
-            mFileName = file.getName();
-            mFileDirectory = mContext.getString(R.string.file_path);
-            PrintStream ps = null;
-            try {
-                FileOutputStream fos = new FileOutputStream(file);
-                ps = new PrintStream(fos);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return null;
-            } catch (NullPointerException e) {
-                e.printStackTrace();
-                return null;
-            }
-            return ps;
         }
-    }
-
-    /**
-     * Generate the text file to store imported data
-     */
-    private static File generateFileMountedOnSDcard(Context context, int filePathResId, int fileNameFormatResId) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(Environment.getExternalStorageDirectory());
-        sb.append(context.getString(filePathResId));
-        File filedir = new File(sb.toString());
-        sb.append(context.getString(
-                fileNameFormatResId,
-                DateFormat.format(context.getString(R.string.format_date_ymd),
-                        System.currentTimeMillis())));
-        File file = new File(sb.toString());
-
-        try {
-            if (!filedir.exists()) {
-                filedir.mkdir();
-            }
-            if (!file.exists()) {
-                file.createNewFile();
-            }
-            return file;
-        } catch (SecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return null;
     }
 }
 

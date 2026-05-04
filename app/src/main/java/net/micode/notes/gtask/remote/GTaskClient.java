@@ -1,19 +1,3 @@
-/*
- * Copyright (c) 2010-2011, The MiCode Open Source Community (www.micode.net)
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package net.micode.notes.gtask.remote;
 
 import android.accounts.Account;
@@ -32,20 +16,6 @@ import net.micode.notes.gtask.exception.NetworkFailureException;
 import net.micode.notes.tool.GTaskStringUtils;
 import net.micode.notes.ui.NotesPreferenceActivity;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.cookie.Cookie;
-import org.apache.http.impl.client.BasicCookieStore;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.params.HttpProtocolParams;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -54,12 +24,18 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.LinkedList;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
+import javax.net.ssl.HttpsURLConnection;
 
 public class GTaskClient {
     private static final String TAG = GTaskClient.class.getSimpleName();
@@ -72,26 +48,22 @@ public class GTaskClient {
 
     private static GTaskClient mInstance = null;
 
-    private DefaultHttpClient mHttpClient;
-
+    // 替换 DefaultHttpClient，自行管理 Cookie
+    private String mCookie;
     private String mGetUrl;
-
     private String mPostUrl;
-
     private long mClientVersion;
-
     private boolean mLoggedin;
-
     private long mLastLoginTime;
-
     private int mActionId;
-
     private Account mAccount;
-
     private JSONArray mUpdateArray;
 
+    private static final int CONNECT_TIMEOUT = 10000;
+    private static final int READ_TIMEOUT = 15000;
+
     private GTaskClient() {
-        mHttpClient = null;
+        mCookie = null;
         mGetUrl = GTASK_GET_URL;
         mPostUrl = GTASK_POST_URL;
         mClientVersion = -1;
@@ -110,14 +82,11 @@ public class GTaskClient {
     }
 
     public boolean login(Activity activity) {
-        // we suppose that the cookie would expire after 5 minutes
-        // then we need to re-login
         final long interval = 1000 * 60 * 5;
         if (mLastLoginTime + interval < System.currentTimeMillis()) {
             mLoggedin = false;
         }
 
-        // need to re-login after account switch
         if (mLoggedin
                 && !TextUtils.equals(getSyncAccount().name, NotesPreferenceActivity
                         .getSyncAccountName(activity))) {
@@ -136,7 +105,6 @@ public class GTaskClient {
             return false;
         }
 
-        // login with custom domain if necessary
         if (!(mAccount.name.toLowerCase().endsWith("gmail.com") || mAccount.name.toLowerCase()
                 .endsWith("googlemail.com"))) {
             StringBuilder url = new StringBuilder(GTASK_URL).append("a/");
@@ -151,7 +119,6 @@ public class GTaskClient {
             }
         }
 
-        // try to login with google official url
         if (!mLoggedin) {
             mGetUrl = GTASK_GET_URL;
             mPostUrl = GTASK_POST_URL;
@@ -189,7 +156,6 @@ public class GTaskClient {
             return null;
         }
 
-        // get the token now
         AccountManagerFuture<Bundle> accountManagerFuture = accountManager.getAuthToken(account,
                 "goanna_mobile", null, activity, null, null);
         try {
@@ -209,8 +175,6 @@ public class GTaskClient {
 
     private boolean tryToLoginGtask(Activity activity, String authToken) {
         if (!loginGtask(authToken)) {
-            // maybe the auth token is out of date, now let's invalidate the
-            // token and try again
             authToken = loginGoogleAccount(activity, true);
             if (authToken == null) {
                 Log.e(TAG, "login google account failed");
@@ -226,37 +190,46 @@ public class GTaskClient {
     }
 
     private boolean loginGtask(String authToken) {
-        int timeoutConnection = 10000;
-        int timeoutSocket = 15000;
-        HttpParams httpParameters = new BasicHttpParams();
-        HttpConnectionParams.setConnectionTimeout(httpParameters, timeoutConnection);
-        HttpConnectionParams.setSoTimeout(httpParameters, timeoutSocket);
-        mHttpClient = new DefaultHttpClient(httpParameters);
-        BasicCookieStore localBasicCookieStore = new BasicCookieStore();
-        mHttpClient.setCookieStore(localBasicCookieStore);
-        HttpProtocolParams.setUseExpectContinue(mHttpClient.getParams(), false);
-
-        // login gtask
+        // 使用 HttpsURLConnection 执行 GET 登录并保存 Cookie
+        HttpURLConnection conn = null;
         try {
             String loginUrl = mGetUrl + "?auth=" + authToken;
-            HttpGet httpGet = new HttpGet(loginUrl);
-            HttpResponse response = null;
-            response = mHttpClient.execute(httpGet);
+            URL url = new URL(loginUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(CONNECT_TIMEOUT);
+            conn.setReadTimeout(READ_TIMEOUT);
+            conn.setInstanceFollowRedirects(false);
+            conn.setRequestMethod("GET");
 
-            // get the cookie now
-            List<Cookie> cookies = mHttpClient.getCookieStore().getCookies();
-            boolean hasAuthCookie = false;
-            for (Cookie cookie : cookies) {
-                if (cookie.getName().contains("GTL")) {
-                    hasAuthCookie = true;
+            int responseCode = conn.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                Log.e(TAG, "login http fail: " + responseCode);
+                return false;
+            }
+
+            // 保存所有 Set-Cookie 响应头
+            Map<String, List<String>> headers = conn.getHeaderFields();
+            List<String> setCookies = headers.get("Set-Cookie");
+            if (setCookies != null && !setCookies.isEmpty()) {
+                StringBuilder cookieBuilder = new StringBuilder();
+                for (String cookie : setCookies) {
+                    if (cookieBuilder.length() > 0) cookieBuilder.append("; ");
+                    cookieBuilder.append(cookie.split(";")[0]); // 取 cookie 名值部分
                 }
+                mCookie = cookieBuilder.toString();
+            }
+
+            // 检查是否存在 GTL 认证 cookie
+            boolean hasAuthCookie = false;
+            if (mCookie != null && mCookie.contains("GTL")) {
+                hasAuthCookie = true;
             }
             if (!hasAuthCookie) {
                 Log.w(TAG, "it seems that there is no auth cookie");
             }
 
-            // get the client version
-            String resString = getResponseContent(response.getEntity());
+            // 读取响应内容，解析 client version
+            String resString = getResponseContent(conn.getInputStream(), conn.getContentEncoding());
             String jsBegin = "_setup(";
             String jsEnd = ")}</script>";
             int begin = resString.indexOf(jsBegin);
@@ -267,57 +240,107 @@ public class GTaskClient {
             }
             JSONObject js = new JSONObject(jsString);
             mClientVersion = js.getLong("v");
+            return true;
         } catch (JSONException e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
             return false;
-        } catch (Exception e) {
-            // simply catch all exceptions
-            Log.e(TAG, "httpget gtask_url failed");
+        } catch (IOException e) {
+            Log.e(TAG, "httpget gtask_url failed", e);
             return false;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
-
-        return true;
     }
 
     private int getActionId() {
         return mActionId++;
     }
 
-    private HttpPost createHttpPost() {
-        HttpPost httpPost = new HttpPost(mPostUrl);
-        httpPost.setHeader("Content-Type", "application/x-www-form-urlencoded;charset=utf-8");
-        httpPost.setHeader("AT", "1");
-        return httpPost;
+    // 统一的 GET 请求，返回响应字符串，自动附加 Cookie 和压缩处理
+    private String doGetRequest(String urlStr) throws IOException {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(CONNECT_TIMEOUT);
+            conn.setReadTimeout(READ_TIMEOUT);
+            conn.setRequestMethod("GET");
+            if (mCookie != null) {
+                conn.setRequestProperty("Cookie", mCookie);
+            }
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new IOException("HTTP GET failed: " + responseCode);
+            }
+
+            return getResponseContent(conn.getInputStream(), conn.getContentEncoding());
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
     }
 
-    private String getResponseContent(HttpEntity entity) throws IOException {
-        String contentEncoding = null;
-        if (entity.getContentEncoding() != null) {
-            contentEncoding = entity.getContentEncoding().getValue();
-            Log.d(TAG, "encoding: " + contentEncoding);
-        }
+    // 统一的 POST 请求，发送表单编码数据，返回 JSONObject
+    private JSONObject doPostRequest(String postBody) throws IOException, JSONException {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(mPostUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(CONNECT_TIMEOUT);
+            conn.setReadTimeout(READ_TIMEOUT);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=utf-8");
+            conn.setRequestProperty("AT", "1");
+            if (mCookie != null) {
+                conn.setRequestProperty("Cookie", mCookie);
+            }
 
-        InputStream input = entity.getContent();
-        if (contentEncoding != null && contentEncoding.equalsIgnoreCase("gzip")) {
-            input = new GZIPInputStream(entity.getContent());
-        } else if (contentEncoding != null && contentEncoding.equalsIgnoreCase("deflate")) {
-            Inflater inflater = new Inflater(true);
-            input = new InflaterInputStream(entity.getContent(), inflater);
+            // 写入请求体
+            OutputStream os = conn.getOutputStream();
+            os.write(postBody.getBytes("UTF-8"));
+            os.flush();
+            os.close();
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new IOException("HTTP POST failed: " + responseCode);
+            }
+
+            String jsString = getResponseContent(conn.getInputStream(), conn.getContentEncoding());
+            return new JSONObject(jsString);
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    // 压缩处理的响应内容读取（与原实现相同，但接收 InputStream）
+    private String getResponseContent(InputStream input, String contentEncoding) throws IOException {
+        if (contentEncoding != null) {
+            contentEncoding = contentEncoding.toLowerCase();
+            if (contentEncoding.contains("gzip")) {
+                input = new GZIPInputStream(input);
+            } else if (contentEncoding.contains("deflate")) {
+                Inflater inflater = new Inflater(true);
+                input = new InflaterInputStream(input, inflater);
+            }
         }
 
         try {
-            InputStreamReader isr = new InputStreamReader(input);
-            BufferedReader br = new BufferedReader(isr);
+            BufferedReader br = new BufferedReader(new InputStreamReader(input, "UTF-8"));
             StringBuilder sb = new StringBuilder();
-
-            while (true) {
-                String buff = br.readLine();
-                if (buff == null) {
-                    return sb.toString();
-                }
-                sb = sb.append(buff);
+            String line;
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
             }
+            return sb.toString();
         } finally {
             input.close();
         }
@@ -329,22 +352,10 @@ public class GTaskClient {
             throw new ActionFailureException("not logged in");
         }
 
-        HttpPost httpPost = createHttpPost();
         try {
-            LinkedList<BasicNameValuePair> list = new LinkedList<BasicNameValuePair>();
-            list.add(new BasicNameValuePair("r", js.toString()));
-            UrlEncodedFormEntity entity = new UrlEncodedFormEntity(list, "UTF-8");
-            httpPost.setEntity(entity);
-
-            // execute the post
-            HttpResponse response = mHttpClient.execute(httpPost);
-            String jsString = getResponseContent(response.getEntity());
-            return new JSONObject(jsString);
-
-        } catch (ClientProtocolException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
-            throw new NetworkFailureException("postRequest failed");
+            // 构建表单：r=<json>
+            String postData = "r=" + URLEncoder.encode(js.toString(), "UTF-8");
+            return doPostRequest(postData);
         } catch (IOException e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -365,20 +376,13 @@ public class GTaskClient {
         try {
             JSONObject jsPost = new JSONObject();
             JSONArray actionList = new JSONArray();
-
-            // action_list
             actionList.put(task.getCreateAction(getActionId()));
             jsPost.put(GTaskStringUtils.GTASK_JSON_ACTION_LIST, actionList);
-
-            // client_version
             jsPost.put(GTaskStringUtils.GTASK_JSON_CLIENT_VERSION, mClientVersion);
-
-            // post
             JSONObject jsResponse = postRequest(jsPost);
             JSONObject jsResult = (JSONObject) jsResponse.getJSONArray(
                     GTaskStringUtils.GTASK_JSON_RESULTS).get(0);
             task.setGid(jsResult.getString(GTaskStringUtils.GTASK_JSON_NEW_ID));
-
         } catch (JSONException e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -391,20 +395,13 @@ public class GTaskClient {
         try {
             JSONObject jsPost = new JSONObject();
             JSONArray actionList = new JSONArray();
-
-            // action_list
             actionList.put(tasklist.getCreateAction(getActionId()));
             jsPost.put(GTaskStringUtils.GTASK_JSON_ACTION_LIST, actionList);
-
-            // client version
             jsPost.put(GTaskStringUtils.GTASK_JSON_CLIENT_VERSION, mClientVersion);
-
-            // post
             JSONObject jsResponse = postRequest(jsPost);
             JSONObject jsResult = (JSONObject) jsResponse.getJSONArray(
                     GTaskStringUtils.GTASK_JSON_RESULTS).get(0);
             tasklist.setGid(jsResult.getString(GTaskStringUtils.GTASK_JSON_NEW_ID));
-
         } catch (JSONException e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -416,13 +413,8 @@ public class GTaskClient {
         if (mUpdateArray != null) {
             try {
                 JSONObject jsPost = new JSONObject();
-
-                // action_list
                 jsPost.put(GTaskStringUtils.GTASK_JSON_ACTION_LIST, mUpdateArray);
-
-                // client_version
                 jsPost.put(GTaskStringUtils.GTASK_JSON_CLIENT_VERSION, mClientVersion);
-
                 postRequest(jsPost);
                 mUpdateArray = null;
             } catch (JSONException e) {
@@ -435,12 +427,9 @@ public class GTaskClient {
 
     public void addUpdateNode(Node node) throws NetworkFailureException {
         if (node != null) {
-            // too many update items may result in an error
-            // set max to 10 items
             if (mUpdateArray != null && mUpdateArray.length() > 10) {
                 commitUpdate();
             }
-
             if (mUpdateArray == null)
                 mUpdateArray = new JSONArray();
             mUpdateArray.put(node.getUpdateAction(getActionId()));
@@ -454,31 +443,22 @@ public class GTaskClient {
             JSONObject jsPost = new JSONObject();
             JSONArray actionList = new JSONArray();
             JSONObject action = new JSONObject();
-
-            // action_list
             action.put(GTaskStringUtils.GTASK_JSON_ACTION_TYPE,
                     GTaskStringUtils.GTASK_JSON_ACTION_TYPE_MOVE);
             action.put(GTaskStringUtils.GTASK_JSON_ACTION_ID, getActionId());
             action.put(GTaskStringUtils.GTASK_JSON_ID, task.getGid());
             if (preParent == curParent && task.getPriorSibling() != null) {
-                // put prioring_sibing_id only if moving within the tasklist and
-                // it is not the first one
                 action.put(GTaskStringUtils.GTASK_JSON_PRIOR_SIBLING_ID, task.getPriorSibling());
             }
             action.put(GTaskStringUtils.GTASK_JSON_SOURCE_LIST, preParent.getGid());
             action.put(GTaskStringUtils.GTASK_JSON_DEST_PARENT, curParent.getGid());
             if (preParent != curParent) {
-                // put the dest_list only if moving between tasklists
                 action.put(GTaskStringUtils.GTASK_JSON_DEST_LIST, curParent.getGid());
             }
             actionList.put(action);
             jsPost.put(GTaskStringUtils.GTASK_JSON_ACTION_LIST, actionList);
-
-            // client_version
             jsPost.put(GTaskStringUtils.GTASK_JSON_CLIENT_VERSION, mClientVersion);
-
             postRequest(jsPost);
-
         } catch (JSONException e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -491,15 +471,10 @@ public class GTaskClient {
         try {
             JSONObject jsPost = new JSONObject();
             JSONArray actionList = new JSONArray();
-
-            // action_list
             node.setDeleted(true);
             actionList.put(node.getUpdateAction(getActionId()));
             jsPost.put(GTaskStringUtils.GTASK_JSON_ACTION_LIST, actionList);
-
-            // client_version
             jsPost.put(GTaskStringUtils.GTASK_JSON_CLIENT_VERSION, mClientVersion);
-
             postRequest(jsPost);
             mUpdateArray = null;
         } catch (JSONException e) {
@@ -516,12 +491,7 @@ public class GTaskClient {
         }
 
         try {
-            HttpGet httpGet = new HttpGet(mGetUrl);
-            HttpResponse response = null;
-            response = mHttpClient.execute(httpGet);
-
-            // get the task list
-            String resString = getResponseContent(response.getEntity());
+            String resString = doGetRequest(mGetUrl);
             String jsBegin = "_setup(";
             String jsEnd = ")}</script>";
             int begin = resString.indexOf(jsBegin);
@@ -532,10 +502,6 @@ public class GTaskClient {
             }
             JSONObject js = new JSONObject(jsString);
             return js.getJSONObject("t").getJSONArray(GTaskStringUtils.GTASK_JSON_LISTS);
-        } catch (ClientProtocolException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
-            throw new NetworkFailureException("gettasklists: httpget failed");
         } catch (IOException e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -553,8 +519,6 @@ public class GTaskClient {
             JSONObject jsPost = new JSONObject();
             JSONArray actionList = new JSONArray();
             JSONObject action = new JSONObject();
-
-            // action_list
             action.put(GTaskStringUtils.GTASK_JSON_ACTION_TYPE,
                     GTaskStringUtils.GTASK_JSON_ACTION_TYPE_GETALL);
             action.put(GTaskStringUtils.GTASK_JSON_ACTION_ID, getActionId());
@@ -562,10 +526,7 @@ public class GTaskClient {
             action.put(GTaskStringUtils.GTASK_JSON_GET_DELETED, false);
             actionList.put(action);
             jsPost.put(GTaskStringUtils.GTASK_JSON_ACTION_LIST, actionList);
-
-            // client_version
             jsPost.put(GTaskStringUtils.GTASK_JSON_CLIENT_VERSION, mClientVersion);
-
             JSONObject jsResponse = postRequest(jsPost);
             return jsResponse.getJSONArray(GTaskStringUtils.GTASK_JSON_TASKS);
         } catch (JSONException e) {
