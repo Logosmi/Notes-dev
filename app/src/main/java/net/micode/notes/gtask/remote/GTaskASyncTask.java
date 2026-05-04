@@ -24,6 +24,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 
+import android.app.NotificationChannel;
+import android.os.Build;
+import android.Manifest;
+
 import net.micode.notes.R;
 import net.micode.notes.ui.NotesListActivity;
 import net.micode.notes.ui.NotesPreferenceActivity;
@@ -64,22 +68,39 @@ public class GTaskASyncTask extends AsyncTask<Void, String, Integer> {
     }
 
     private void showNotification(int tickerId, String content) {
-        Notification notification = new Notification(R.drawable.notification, mContext
-                .getString(tickerId), System.currentTimeMillis());
-        notification.defaults = Notification.DEFAULT_LIGHTS;
-        notification.flags = Notification.FLAG_AUTO_CANCEL;
+        // 创建通知渠道（Android 8.0+ 必须）
+        final String CHANNEL_ID = "gTask_sync_channel";
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    mContext.getString(R.string.app_name),
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+            mNotifiManager.createNotificationChannel(channel);
+        }
+
+        // 准备 PendingIntent
         PendingIntent pendingIntent;
         if (tickerId != R.string.ticker_success) {
-            pendingIntent = PendingIntent.getActivity(mContext, 0, new Intent(mContext,
-                    NotesPreferenceActivity.class), 0);
-
+            pendingIntent = PendingIntent.getActivity(mContext, 0,
+                    new Intent(mContext, NotesPreferenceActivity.class), 0);
         } else {
-            pendingIntent = PendingIntent.getActivity(mContext, 0, new Intent(mContext,
-                    NotesListActivity.class), 0);
+            pendingIntent = PendingIntent.getActivity(mContext, 0,
+                    new Intent(mContext, NotesListActivity.class), 0);
         }
-        notification.setLatestEventInfo(mContext, mContext.getString(R.string.app_name), content,
-                pendingIntent);
-        mNotifiManager.notify(GTASK_SYNC_NOTIFICATION_ID, notification);
+
+        // 用 Notification.Builder 构建通知
+        Notification.Builder builder = new Notification.Builder(mContext, CHANNEL_ID)
+                .setSmallIcon(R.drawable.notification)
+                .setTicker(mContext.getString(tickerId))
+                .setWhen(System.currentTimeMillis())
+                .setDefaults(Notification.DEFAULT_LIGHTS)
+                .setAutoCancel(true)
+                .setContentTitle(mContext.getString(R.string.app_name))
+                .setContentText(content)
+                .setContentIntent(pendingIntent);
+
+        mNotifiManager.notify(GTASK_SYNC_NOTIFICATION_ID, builder.build());
     }
 
     @Override
