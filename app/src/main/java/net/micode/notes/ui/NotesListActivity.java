@@ -62,6 +62,7 @@ import android.widget.Toast;
 
 import android.os.Build;
 import android.Manifest;
+import android.widget.PopupMenu;
 
 import androidx.work.Data;
 import androidx.work.OneTimeWorkRequest;
@@ -945,13 +946,25 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
             if (mFocusNoteDataItem.getType() == Notes.TYPE_NOTE && !mNotesListAdapter.isInChoiceMode()) {
                 int realPosition = position - mNotesListView.getHeaderViewsCount();
                 if (mNotesListView.startActionMode(mModeCallBack) != null) {
-                    mModeCallBack.onItemCheckedStateChanged(null, position, id, true);
+                    mModeCallBack.onItemCheckedStateChanged(null, realPosition, id, true);
                     mNotesListView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 } else {
                     Log.e(TAG, "startActionMode fails");
                 }
+                return true;
             } else if (mFocusNoteDataItem.getType() == Notes.TYPE_FOLDER) {
-                mNotesListView.setOnCreateContextMenuListener(mFolderOnCreateContextMenuListener);
+                if (mModeCallBack.mActionMode != null) {
+                    mModeCallBack.finishActionMode();
+                }
+                PopupMenu popup = new PopupMenu(NotesListActivity.this, view);
+                popup.getMenu().add(0, MENU_FOLDER_VIEW, 0, R.string.menu_folder_view);
+                popup.getMenu().add(0, MENU_FOLDER_DELETE, 0, R.string.menu_folder_delete);
+                popup.getMenu().add(0, MENU_FOLDER_CHANGE_NAME, 0, R.string.menu_folder_change_name);
+                popup.setOnMenuItemClickListener(item -> {
+                    onContextItemSelected(item);
+                    return true;
+                });
+                popup.show();
             }
         }
         return true;
