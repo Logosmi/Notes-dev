@@ -507,48 +507,38 @@ public class NoteEditActivity extends Activity implements OnClickListener,
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_new_note:
-                createNewNote();
-                break;
-            case R.id.menu_delete:
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle(getString(R.string.alert_title_delete));
-                builder.setIcon(android.R.drawable.ic_dialog_alert);
-                builder.setMessage(getString(R.string.alert_message_delete_note));
-                builder.setPositiveButton(android.R.string.ok,
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                deleteCurrentNote();
-                                finish();
-                            }
-                        });
-                builder.setNegativeButton(android.R.string.cancel, null);
-                builder.show();
-                break;
-            case R.id.menu_font_size:
-                mFontSizeSelector.setVisibility(View.VISIBLE);
-                findViewById(sFontSelectorSelectionMap.get(mFontSizeId)).setVisibility(View.VISIBLE);
-                break;
-            case R.id.menu_list_mode:
-                mWorkingNote.setCheckListMode(mWorkingNote.getCheckListMode() == 0 ?
-                        TextNote.MODE_CHECK_LIST : 0);
-                break;
-            case R.id.menu_share:
-                getWorkingText();
-                sendTo(this, mWorkingNote.getContent());
-                break;
-            case R.id.menu_send_to_desktop:
-                sendToDesktop();
-                break;
-            case R.id.menu_alert:
-                setReminder();
-                break;
-            case R.id.menu_delete_remind:
-                mWorkingNote.setAlertDate(0, false);
-                break;
-            default:
-                break;
+        int id = item.getItemId();
+        if (id == R.id.menu_new_note) {
+            createNewNote();
+        } else if (id == R.id.menu_delete) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle(getString(R.string.alert_title_delete));
+            builder.setIcon(android.R.drawable.ic_dialog_alert);
+            builder.setMessage(getString(R.string.alert_message_delete_note));
+            builder.setPositiveButton(android.R.string.ok,
+                    new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            deleteCurrentNote();
+                            finish();
+                        }
+                    });
+            builder.setNegativeButton(android.R.string.cancel, null);
+            builder.show();
+        } else if (id == R.id.menu_font_size) {
+            mFontSizeSelector.setVisibility(View.VISIBLE);
+            findViewById(sFontSelectorSelectionMap.get(mFontSizeId)).setVisibility(View.VISIBLE);
+        } else if (id == R.id.menu_list_mode) {
+            mWorkingNote.setCheckListMode(mWorkingNote.getCheckListMode() == 0 ?
+                    TextNote.MODE_CHECK_LIST : 0);
+        } else if (id == R.id.menu_share) {
+            getWorkingText();
+            sendTo(this, mWorkingNote.getContent());
+        } else if (id == R.id.menu_send_to_desktop) {
+            sendToDesktop();
+        } else if (id == R.id.menu_alert) {
+            setReminder();
+        } else if (id == R.id.menu_delete_remind) {
+            mWorkingNote.setAlertDate(0, false);
         }
         return true;
     }

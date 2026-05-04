@@ -950,6 +950,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         if (view instanceof NotesListItem) {
             mFocusNoteDataItem = ((NotesListItem) view).getItemData();
             if (mFocusNoteDataItem.getType() == Notes.TYPE_NOTE && !mNotesListAdapter.isInChoiceMode()) {
+                int realPosition = position - mNotesListView.getHeaderViewsCount();
                 if (mNotesListView.startActionMode(mModeCallBack) != null) {
                     mModeCallBack.onItemCheckedStateChanged(null, position, id, true);
                     mNotesListView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
@@ -960,6 +961,6 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
                 mNotesListView.setOnCreateContextMenuListener(mFolderOnCreateContextMenuListener);
             }
         }
-        return false;
+        return true;
     }
 }
