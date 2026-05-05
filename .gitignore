@@ -1,0 +1,27 @@
+# ---- Gradle & Build outputs ----
+/build/
+/app/build/
+/*/build/
+.gradle/
+*.apk
+*.ap_
+*.dex
+*.class
+
+# ---- Android generated ----
+local.properties
+*.log
+captures/
+
+# ---- IDE (IntelliJ/Android Studio) ----
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# ---- OS generated ----
+.DS_Store
+Thumbs.db
+
+# ---- Others ----
+TODO
