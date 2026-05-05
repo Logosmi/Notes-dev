@@ -30,12 +30,17 @@ import net.micode.notes.data.Notes.NoteColumns;
 public class NotesDatabaseHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "note.db";
 
-    private static final int DB_VERSION = 4;
+    private static final int DB_VERSION = 5;
 
     public interface TABLE {
         public static final String NOTE = "note";
 
         public static final String DATA = "data";
+
+        public static final String USER = "user";
+        public static final String TAG = "tag";
+        public static final String NOTE_TAG = "note_tag";
+        public static final String IMAGE = "image";
     }
 
     private static final String TAG = "NotesDatabaseHelper";
@@ -81,6 +86,45 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
     private static final String CREATE_DATA_NOTE_ID_INDEX_SQL =
         "CREATE INDEX IF NOT EXISTS note_id_index ON " +
         TABLE.DATA + "(" + DataColumns.NOTE_ID + ");";
+
+    private static final String CREATE_USER_TABLE_SQL =
+    "CREATE TABLE " + TABLE.USER + "(" +
+        "_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+        "username TEXT NOT NULL UNIQUE," +
+        "passwordHash TEXT NOT NULL," +
+        "securityQuestion TEXT NOT NULL," +
+        "securityAnswerHash TEXT NOT NULL," +
+        "failCount INTEGER NOT NULL DEFAULT 0," +
+        "createdTime INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)" +
+    ")";
+
+    private static final String CREATE_TAG_TABLE_SQL =
+        "CREATE TABLE " + TABLE.TAG + "(" +
+            "_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+            "name TEXT NOT NULL UNIQUE," +
+            "color INTEGER NOT NULL DEFAULT 0," +
+            "createdTime INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)" +
+        ")";
+
+    private static final String CREATE_NOTE_TAG_TABLE_SQL =
+        "CREATE TABLE " + TABLE.NOTE_TAG + "(" +
+            "noteId INTEGER NOT NULL," +
+            "tagId INTEGER NOT NULL," +
+            "PRIMARY KEY (noteId, tagId)" +
+        ")";
+
+    private static final String CREATE_IMAGE_TABLE_SQL =
+        "CREATE TABLE " + TABLE.IMAGE + "(" +
+            "_id INTEGER PRIMARY KEY AUTOINCREMENT," +
+            "noteId INTEGER NOT NULL," +
+            "localFilePath TEXT NOT NULL," +
+            "fileName TEXT NOT NULL," +
+            "fileSize INTEGER NOT NULL DEFAULT 0," +
+            "width INTEGER NOT NULL DEFAULT 0," +
+            "height INTEGER NOT NULL DEFAULT 0," +
+            "mimeType TEXT NOT NULL," +
+            "createdTime INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)" +
+        ")";
 
     /**
      * Increase folder's note count when move note to the folder
@@ -277,6 +321,22 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
         Log.d(TAG, "data table has been created");
     }
 
+    public void createUserTable(SQLiteDatabase db) {
+    db.execSQL(CREATE_USER_TABLE_SQL);
+    Log.d(TAG, "user table has been created");
+    }
+
+    public void createTagTable(SQLiteDatabase db) {
+        db.execSQL(CREATE_TAG_TABLE_SQL);
+        db.execSQL(CREATE_NOTE_TAG_TABLE_SQL);
+        Log.d(TAG, "tag tables have been created");
+    }
+
+    public void createImageTable(SQLiteDatabase db) {
+        db.execSQL(CREATE_IMAGE_TABLE_SQL);
+        Log.d(TAG, "image table has been created");
+    }
+
     private void reCreateDataTableTriggers(SQLiteDatabase db) {
         db.execSQL("DROP TRIGGER IF EXISTS update_note_content_on_insert");
         db.execSQL("DROP TRIGGER IF EXISTS update_note_content_on_update");
@@ -294,10 +354,13 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
         return mInstance;
     }
 
-    @Override
+   @Override
     public void onCreate(SQLiteDatabase db) {
         createNoteTable(db);
         createDataTable(db);
+        createUserTable(db);
+        createTagTable(db);
+        createImageTable(db);
     }
 
     @Override
@@ -307,18 +370,20 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
 
         if (oldVersion == 1) {
             upgradeToV2(db);
-            skipV2 = true; // this upgrade including the upgrade from v2 to v3
+            skipV2 = true;
             oldVersion++;
         }
-
         if (oldVersion == 2 && !skipV2) {
             upgradeToV3(db);
             reCreateTriggers = true;
             oldVersion++;
         }
-
         if (oldVersion == 3) {
             upgradeToV4(db);
+            oldVersion++;
+        }
+        if (oldVersion == 4) {
+            upgradeToV5(db);
             oldVersion++;
         }
 
@@ -326,10 +391,8 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
             reCreateNoteTableTriggers(db);
             reCreateDataTableTriggers(db);
         }
-
         if (oldVersion != newVersion) {
-            throw new IllegalStateException("Upgrade notes database to version " + newVersion
-                    + "fails");
+            throw new IllegalStateException("Upgrade notes database to version " + newVersion + " fails");
         }
     }
 
@@ -358,5 +421,11 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
     private void upgradeToV4(SQLiteDatabase db) {
         db.execSQL("ALTER TABLE " + TABLE.NOTE + " ADD COLUMN " + NoteColumns.VERSION
                 + " INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private void upgradeToV5(SQLiteDatabase db) {
+        createUserTable(db);
+        createTagTable(db);
+        createImageTable(db);
     }
 }

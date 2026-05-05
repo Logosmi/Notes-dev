@@ -49,6 +49,14 @@ public class NotesProvider extends ContentProvider {
 
     private static final int URI_SEARCH          = 5;
     private static final int URI_SEARCH_SUGGEST  = 6;
+    private static final int URI_USER            = 7;
+    private static final int URI_USER_ITEM       = 8;
+    private static final int URI_TAG             = 9;
+    private static final int URI_TAG_ITEM        = 10;
+    private static final int URI_NOTE_TAG        = 11;
+    private static final int URI_NOTE_TAG_ITEM   = 12;
+    private static final int URI_IMAGE           = 13;
+    private static final int URI_IMAGE_ITEM      = 14;
 
     static {
         mMatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -59,6 +67,16 @@ public class NotesProvider extends ContentProvider {
         mMatcher.addURI(Notes.AUTHORITY, "search", URI_SEARCH);
         mMatcher.addURI(Notes.AUTHORITY, SearchManager.SUGGEST_URI_PATH_QUERY, URI_SEARCH_SUGGEST);
         mMatcher.addURI(Notes.AUTHORITY, SearchManager.SUGGEST_URI_PATH_QUERY + "/*", URI_SEARCH_SUGGEST);
+        // 新增：账户、标签、图片表
+    mMatcher.addURI(Notes.AUTHORITY, "user", URI_USER);
+    mMatcher.addURI(Notes.AUTHORITY, "user/#", URI_USER_ITEM);
+    mMatcher.addURI(Notes.AUTHORITY, "tag", URI_TAG);
+    mMatcher.addURI(Notes.AUTHORITY, "tag/#", URI_TAG_ITEM);
+    mMatcher.addURI(Notes.AUTHORITY, "note_tag", URI_NOTE_TAG);
+    // note_tag 可以不需要单独 # 模式，但为通用，也可支持
+    // 暂时不加 note_tag 的 item 匹配，因为通常通过 noteId 或 tagId 查询关联
+    mMatcher.addURI(Notes.AUTHORITY, "image", URI_IMAGE);
+    mMatcher.addURI(Notes.AUTHORITY, "image/#", URI_IMAGE_ITEM);
     }
 
     /**
@@ -138,6 +156,30 @@ public class NotesProvider extends ContentProvider {
                     Log.e(TAG, "got exception: " + ex.toString());
                 }
                 break;
+            case URI_USER:
+                c = db.query(TABLE.USER, projection, selection, selectionArgs, null, null, sortOrder);
+            break;
+            case URI_USER_ITEM:
+                id = uri.getPathSegments().get(1);
+                c = db.query(TABLE.USER, projection, "_id=" + id + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                break;
+            case URI_TAG:
+                c = db.query(TABLE.TAG, projection, selection, selectionArgs, null, null, sortOrder);
+                break;
+            case URI_TAG_ITEM:
+                id = uri.getPathSegments().get(1);
+                c = db.query(TABLE.TAG, projection, "_id=" + id + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                break;
+            case URI_NOTE_TAG:
+                c = db.query(TABLE.NOTE_TAG, projection, selection, selectionArgs, null, null, sortOrder);
+                break;
+            case URI_IMAGE:
+                c = db.query(TABLE.IMAGE, projection, selection, selectionArgs, null, null, sortOrder);
+                break;
+            case URI_IMAGE_ITEM:
+                id = uri.getPathSegments().get(1);
+                c = db.query(TABLE.IMAGE, projection, "_id=" + id + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown URI " + uri);
         }
@@ -152,6 +194,31 @@ public class NotesProvider extends ContentProvider {
         SQLiteDatabase db = mHelper.getWritableDatabase();
         long dataId = 0, noteId = 0, insertedId = 0;
         switch (mMatcher.match(uri)) {
+            case URI_USER:
+                insertedId = db.insert(TABLE.USER, null, values);
+                if (insertedId > 0) {
+                    getContext().getContentResolver().notifyChange(uri, null);
+                }
+                return ContentUris.withAppendedId(uri, insertedId);
+            case URI_TAG:
+                insertedId = db.insert(TABLE.TAG, null, values);
+                if (insertedId > 0) {
+                    getContext().getContentResolver().notifyChange(uri, null);
+                }
+                return ContentUris.withAppendedId(uri, insertedId);
+            case URI_NOTE_TAG:
+                insertedId = db.insert(TABLE.NOTE_TAG, null, values);
+                if (insertedId > 0) {
+                    getContext().getContentResolver().notifyChange(uri, null);
+                }
+                return ContentUris.withAppendedId(uri, insertedId);
+            case URI_IMAGE:
+                insertedId = db.insert(TABLE.IMAGE, null, values);
+                if (insertedId > 0) {
+                    getContext().getContentResolver().notifyChange(uri, null);
+                }
+                return ContentUris.withAppendedId(uri, insertedId);
+
             case URI_NOTE:
                 insertedId = noteId = db.insert(TABLE.NOTE, null, values);
                 break;
@@ -188,6 +255,30 @@ public class NotesProvider extends ContentProvider {
         SQLiteDatabase db = mHelper.getWritableDatabase();
         boolean deleteData = false;
         switch (mMatcher.match(uri)) {
+            case URI_USER:
+                count = db.delete(TABLE.USER, selection, selectionArgs);
+                break;
+            case URI_USER_ITEM:
+                id = uri.getPathSegments().get(1);
+                count = db.delete(TABLE.USER, "_id=" + id + parseSelection(selection), selectionArgs);
+                break;
+            case URI_TAG:
+                count = db.delete(TABLE.TAG, selection, selectionArgs);
+                break;
+            case URI_TAG_ITEM:
+                id = uri.getPathSegments().get(1);
+                count = db.delete(TABLE.TAG, "_id=" + id + parseSelection(selection), selectionArgs);
+                break;
+            case URI_NOTE_TAG:
+                count = db.delete(TABLE.NOTE_TAG, selection, selectionArgs);
+                break;
+            case URI_IMAGE:
+                count = db.delete(TABLE.IMAGE, selection, selectionArgs);
+                break;
+            case URI_IMAGE_ITEM:
+                id = uri.getPathSegments().get(1);
+                count = db.delete(TABLE.IMAGE, "_id=" + id + parseSelection(selection), selectionArgs);
+                break;
             case URI_NOTE:
                 selection = "(" + selection + ") AND " + NoteColumns.ID + ">0 ";
                 count = db.delete(TABLE.NOTE, selection, selectionArgs);
@@ -234,6 +325,30 @@ public class NotesProvider extends ContentProvider {
         SQLiteDatabase db = mHelper.getWritableDatabase();
         boolean updateData = false;
         switch (mMatcher.match(uri)) {
+            case URI_USER:
+                count = db.update(TABLE.USER, values, selection, selectionArgs);
+                break;
+            case URI_USER_ITEM:
+                id = uri.getPathSegments().get(1);
+                count = db.update(TABLE.USER, values, "_id=" + id + parseSelection(selection), selectionArgs);
+                break;
+            case URI_TAG:
+                count = db.update(TABLE.TAG, values, selection, selectionArgs);
+                break;
+            case URI_TAG_ITEM:
+                id = uri.getPathSegments().get(1);
+                count = db.update(TABLE.TAG, values, "_id=" + id + parseSelection(selection), selectionArgs);
+                break;
+            case URI_NOTE_TAG:
+                count = db.update(TABLE.NOTE_TAG, values, selection, selectionArgs);
+                break;
+            case URI_IMAGE:
+                count = db.update(TABLE.IMAGE, values, selection, selectionArgs);
+                break;
+            case URI_IMAGE_ITEM:
+                id = uri.getPathSegments().get(1);
+                count = db.update(TABLE.IMAGE, values, "_id=" + id + parseSelection(selection), selectionArgs);
+                break;
             case URI_NOTE:
                 increaseNoteVersion(-1, selection, selectionArgs);
                 count = db.update(TABLE.NOTE, values, selection, selectionArgs);
