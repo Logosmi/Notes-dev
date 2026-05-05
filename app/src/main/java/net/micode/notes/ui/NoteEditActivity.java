@@ -52,6 +52,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.os.Build;
+import android.provider.Settings;
+
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.TextNote;
@@ -603,30 +606,35 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     }
 
     public void onClockAlertChanged(long date, boolean set) {
-        /**
-         * User could set clock to an unsaved note, so before setting the
-         * alert clock, we should save the note first
-         */
         if (!mWorkingNote.existInDatabase()) {
             saveNote();
         }
         if (mWorkingNote.getNoteId() > 0) {
             Intent intent = new Intent(this, AlarmReceiver.class);
             intent.setData(ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, mWorkingNote.getNoteId()));
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
-            AlarmManager alarmManager = ((AlarmManager) getSystemService(ALARM_SERVICE));
+
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                    this, 0, intent,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+            AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
             showAlertHeader();
-            if(!set) {
+
+            if (!set) {
                 alarmManager.cancel(pendingIntent);
             } else {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, date, pendingIntent);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (alarmManager.canScheduleExactAlarms()) {
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, date, pendingIntent);
+                    } else {
+                        Toast.makeText(this, R.string.error_note_empty_for_clock, Toast.LENGTH_SHORT).show();
+                        alarmManager.set(AlarmManager.RTC_WAKEUP, date, pendingIntent);
+                    }
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, date, pendingIntent);
+                }
             }
         } else {
-            /**
-             * There is the condition that user has input nothing (the note is
-             * not worthy saving), we have no note id, remind the user that he
-             * should input something
-             */
             Log.e(TAG, "Clock alert setting error");
             showToast(R.string.error_note_empty_for_clock);
         }

@@ -15,13 +15,18 @@
      limitations under the License.
 -->
 
-<searchable
+<!-- <searchable
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:label="@string/search_label"
     android:hint="@string/search_hint"
     android:searchMode="queryRewriteFromText"
-
     android:searchSuggestAuthority="notes"
     android:searchSuggestIntentAction="android.intent.action.VIEW"
     android:searchSettingsDescription="@string/search_setting_description"
-    android:includeInGlobalSearch="true" />
+    android:includeInGlobalSearch="true" /> -->
+
+<searchable xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="@string/search_label"
+    android:hint="@string/search_hint"
+    android:searchSuggestAuthority="net.micode.notes.data.NotesProvider"
+    android:searchSuggestSelection="note_content LIKE ?" />

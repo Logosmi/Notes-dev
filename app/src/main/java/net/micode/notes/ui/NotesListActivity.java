@@ -63,7 +63,7 @@ import android.widget.Toast;
 import android.os.Build;
 import android.Manifest;
 import android.widget.PopupMenu;
-
+import android.app.SearchManager;
 import androidx.work.Data;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkInfo;
@@ -118,6 +118,8 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     private ListView mNotesListView;
 
+    private boolean mIsSearchResult = false;
+
     private Button mAddNewNote;
 
     private boolean mDispatch;
@@ -154,6 +156,34 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     private final static int REQUEST_CODE_NEW_NODE  = 103;
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        setIntent(intent);
+        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+            final String query = intent.getStringExtra(SearchManager.QUERY);
+            handleIntent(intent);
+        }
+    }
+
+    private void handleIntent(Intent intent) {
+        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+            mIsSearchResult = true;
+            String query = intent.getStringExtra(SearchManager.QUERY);
+
+            String selection = NoteColumns.SNIPPET + " LIKE ? AND (" +
+                            NoteColumns.TYPE + "=? OR " + NoteColumns.TYPE + "=?)";
+            String[] selectionArgs = new String[] {
+                "%" + query + "%",
+                String.valueOf(Notes.TYPE_NOTE),
+                String.valueOf(Notes.TYPE_FOLDER)
+            };
+
+            mBackgroundQueryHandler.startQuery(FOLDER_NOTE_LIST_QUERY_TOKEN, null,
+                    Notes.CONTENT_NOTE_URI, NoteItemData.PROJECTION, selection,
+                    selectionArgs, NoteColumns.TYPE + " DESC," + NoteColumns.MODIFIED_DATE + " DESC");
+        }
+    }
+     
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.note_list);
@@ -171,6 +201,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
          * Insert an introduction when user firstly use this application
          */
         setAppInfoFromRawRes();
+        handleIntent(getIntent());
     }
 
     @Override
@@ -671,6 +702,12 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     @Override
     public void onBackPressed() {
+        if (mIsSearchResult) {
+            mIsSearchResult = false;
+            startAsyncNotesListQuery();
+            return;
+        }
+
         switch (mState) {
             case SUB_FOLDER:
                 mCurrentFolderId = Notes.ID_ROOT_FOLDER;
