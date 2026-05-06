@@ -41,11 +41,21 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Toast;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.CheckBox;
+import android.text.InputType;
+import android.preference.PreferenceScreen;
+
 
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.gtask.remote.GTaskSyncService;
+import net.micode.notes.account.LocalAccountManager;
 
 
 public class NotesPreferenceActivity extends PreferenceActivity {
@@ -86,6 +96,48 @@ public class NotesPreferenceActivity extends PreferenceActivity {
         mOriAccounts = null;
         View header = LayoutInflater.from(this).inflate(R.layout.settings_header, null);
         getListView().addHeaderView(header, null, true);
+
+        PreferenceScreen preferenceScreen = getPreferenceScreen();
+
+        PreferenceCategory accountCategory = new PreferenceCategory(this);
+        accountCategory.setTitle("账户管理");
+        preferenceScreen.addPreference(accountCategory);
+
+        Preference changePasswordPref = new Preference(this);
+        changePasswordPref.setTitle("修改密码");
+        changePasswordPref.setSummary("修改当前账户的登录密码");
+        changePasswordPref.setOnPreferenceClickListener(preference -> {
+            showChangePasswordDialog();
+            return true;
+        });
+        accountCategory.addPreference(changePasswordPref);
+
+        Preference changeSecurityPref = new Preference(this);
+        changeSecurityPref.setTitle("修改安全问题");
+        changeSecurityPref.setSummary("重置密保问题及答案");
+        changeSecurityPref.setOnPreferenceClickListener(preference -> {
+            showChangeSecurityDialog();
+            return true;
+        });
+        accountCategory.addPreference(changeSecurityPref);
+
+        Preference logoutPref = new Preference(this);
+        logoutPref.setTitle("注销");
+        logoutPref.setSummary("退出当前账户");
+        logoutPref.setOnPreferenceClickListener(preference -> {
+            showLogoutConfirmDialog();
+            return true;
+        });
+        accountCategory.addPreference(logoutPref);
+
+        Preference deleteAccountPref = new Preference(this);
+        deleteAccountPref.setTitle("删除账户");
+        deleteAccountPref.setSummary("彻底删除当前账户及所有数据");
+        deleteAccountPref.setOnPreferenceClickListener(preference -> {
+            showDeleteAccountConfirmDialog();
+            return true;
+        });
+        accountCategory.addPreference(deleteAccountPref);
     }
 
     @Override
@@ -384,5 +436,160 @@ public class NotesPreferenceActivity extends PreferenceActivity {
             default:
                 return false;
         }
+    }
+
+    private void showChangePasswordDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 32, 48, 16);
+
+        final EditText etCurrentPwd = new EditText(this);
+        etCurrentPwd.setHint("当前密码");
+        layout.addView(etCurrentPwd);
+
+        final EditText etNewPwd = new EditText(this);
+        etNewPwd.setHint("新密码");
+        layout.addView(etNewPwd);
+
+        final EditText etConfirmPwd = new EditText(this);
+        etConfirmPwd.setHint("确认新密码");
+        layout.addView(etConfirmPwd);
+
+        builder.setTitle("修改密码")
+            .setView(layout)
+            .setPositiveButton("确认", (dialog, which) -> {
+                String current = etCurrentPwd.getText().toString().trim();
+                String newPwd = etNewPwd.getText().toString().trim();
+                String confirmPwd = etConfirmPwd.getText().toString().trim();
+                if (current.isEmpty() || newPwd.isEmpty() || confirmPwd.isEmpty()) {
+                    Toast.makeText(this, "所有字段不能为空", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!newPwd.equals(confirmPwd)) {
+                    Toast.makeText(this, "两次密码不一致", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                LocalAccountManager am = new LocalAccountManager(this);
+                boolean success = am.changePassword(current, newPwd);
+                if (success) {
+                    Toast.makeText(this, "密码修改成功", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "当前密码错误", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void showChangeSecurityDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 32, 48, 16);
+
+        final EditText etCurrentPwd = new EditText(this);
+        etCurrentPwd.setHint("当前密码");
+        layout.addView(etCurrentPwd);
+
+        final EditText etNewQuestion = new EditText(this);
+        etNewQuestion.setHint("新问题");
+        layout.addView(etNewQuestion);
+
+        final EditText etNewAnswer = new EditText(this);
+        etNewAnswer.setHint("新答案");
+        layout.addView(etNewAnswer);
+
+        builder.setTitle("修改安全问题")
+            .setView(layout)
+            .setPositiveButton("确认", (dialog, which) -> {
+                String current = etCurrentPwd.getText().toString().trim();
+                String question = etNewQuestion.getText().toString().trim();
+                String answer = etNewAnswer.getText().toString().trim();
+                if (current.isEmpty() || question.isEmpty() || answer.isEmpty()) {
+                    Toast.makeText(this, "所有字段不能为空", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                LocalAccountManager am = new LocalAccountManager(this);
+                boolean success = am.changeSecurityQuestion(current, question, answer);
+                if (success) {
+                    Toast.makeText(this, "安全问题已更新", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "当前密码错误", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void showLogoutConfirmDialog() {
+        new AlertDialog.Builder(this)
+            .setTitle("注销")
+            .setMessage("确定要注销当前账户吗？")
+            .setPositiveButton("确定", (dialog, which) -> {
+                LocalAccountManager am = new LocalAccountManager(this);
+                am.logout();
+                Intent intent = new Intent(this, LoginActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                finish();
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private void showDeleteAccountConfirmDialog() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 16, 48, 0);
+
+        final EditText etPwd = new EditText(this);
+        etPwd.setId(android.R.id.edit);
+        etPwd.setHint("输入当前密码");
+        etPwd.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(etPwd);
+
+        final CheckBox cbDeleteNotes = new CheckBox(this);
+        cbDeleteNotes.setText("同时删除所有便签及文件夹");
+        cbDeleteNotes.setChecked(false);
+        layout.addView(cbDeleteNotes);
+
+        new AlertDialog.Builder(this)
+            .setTitle("删除账户")
+            .setMessage("此操作不可恢复！")
+            .setView(layout)
+            .setPositiveButton("确认删除", (dialog, which) -> {
+                String password = etPwd.getText().toString().trim();
+                if (password.isEmpty()) {
+                    Toast.makeText(this, "密码不能为空", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                LocalAccountManager am = new LocalAccountManager(this);
+                boolean deleteNotes = cbDeleteNotes.isChecked();
+                boolean deleted = am.deleteAccount(password, deleteNotes);
+                if (deleted) {
+                    Toast.makeText(this, "账户已删除", Toast.LENGTH_SHORT).show();
+                    am.logout();
+                    Intent intent = new Intent(this, LoginActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                    finish();
+                } else {
+                    Toast.makeText(this, "密码错误，删除失败", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
+    }
+
+    private LinearLayout createPasswordInput() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setPadding(48, 16, 48, 0);
+        EditText etPwd = new EditText(this);
+        etPwd.setId(android.R.id.edit);
+        etPwd.setHint("输入密码");
+        etPwd.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(etPwd);
+        return layout;
     }
 }

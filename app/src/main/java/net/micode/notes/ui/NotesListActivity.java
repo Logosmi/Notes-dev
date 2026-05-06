@@ -86,6 +86,7 @@ import net.micode.notes.tool.ResourceParser;
 import net.micode.notes.ui.NotesListAdapter.AppWidgetAttribute;
 import net.micode.notes.widget.NoteWidgetProvider_2x;
 import net.micode.notes.widget.NoteWidgetProvider_4x;
+import net.micode.notes.account.LocalAccountManager;
 
 import java.io.BufferedReader;
 import java.io.IOException;

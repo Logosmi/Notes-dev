@@ -3,7 +3,7 @@
 | 文件 | 类型 | 职责概述 |
 |------|------|----------|
 | `User.java` | `<entity>` | 用户实体，属性：`_id`, `username`, `passwordHash`, `securityQuestion`, `securityAnswerHash`, `failCount`, `createdTime`；提供 getter/setter 及 `incrementFailCount()`, `resetFailCount()` |
-| `AccountManager.java` | `<control>` | 账户业务逻辑：注册、登录、密码找回、密码哈希、复杂度校验、登录状态管理 |
+| `LocalAccountManager.java` | `<control>` | 账户业务逻辑：注册、登录、密码找回、密码哈希、复杂度校验、登录状态管理 |
 
 ---
 
@@ -30,9 +30,10 @@
 
 | 文件 | 类型 | 职责概述 |
 |------|------|----------|
-| `LoginActivity.java` | `<boundary>` | 登录界面，调用 `AccountManager.login()` |
-| `RegistrationActivity.java` | `<boundary>` | 注册界面，调用 `AccountManager.register()` |
-| `ForgotPasswordActivity.java` | `<boundary>` | 忘记密码界面，调用 `AccountManager` 验证问题和重置密码 |
+| `LoginActivity.java` | `<boundary>` | 登录界面，调用 `LocalAccountManager.login()` |
+| `RegistrationActivity.java` | `<boundary>` | 注册界面，调用 `LocalAccountManager.register()` |
+| `ChangeSecurityQuestionActivity.java` | `<boundary>` | 改变安全问题，调用 ' LocalAccountManager.changeSecurityQuestion()` |
+| `ForgotPasswordActivity.java` | `<boundary>` | 忘记密码界面，调用 `LocalAccountManager` 验证问题和重置密码 |
 | `TagManagementActivity.java` | `<boundary>` | 标签管理列表，调用 `TagManager` 增删标签 |
 | `TagSelectionDialog.java` | `<boundary>` | 为便签选择标签的对话框，调用 `TagManager` 获取标签列表和关联标签 |
 
@@ -55,7 +56,7 @@
 app/src/main/java/net/micode/notes/
 ├── account/
 │   ├── User.java
-│   └── AccountManager.java
+│   └── LocalAccountManager.java
 ├── tag/
 │   ├── Tag.java
 │   ├── NoteTag.java
@@ -65,6 +66,7 @@ app/src/main/java/net/micode/notes/
 │   └── ImageManager.java
 ├── ui/
 │   ├── (现有 Activity 不变)
+│   ├── ChangeSecurityQuestionActivity.java
 │   ├── LoginActivity.java
 │   ├── RegistrationActivity.java
 │   ├── ForgotPasswordActivity.java
@@ -81,7 +83,7 @@ app/src/main/java/net/micode/notes/
 ### 📁 七、融入现有项目的方式
 
 1. **依赖关系**  
-   - `ui` 包中的新 Activity 通过引入对应包的控制类来执行逻辑（如 `AccountManager`, `TagManager`, `ImageManager`），保持界面与业务分离。
+   - `ui` 包中的新 Activity 通过引入对应包的控制类来执行逻辑（如 `LocalAccountManager`, `TagManager`, `ImageManager`），保持界面与业务分离。
    - 控制类通过 `NotesProvider` 或 `SQLiteDatabase` 操作实体表，完全复用现有数据访问层。
 
 2. **启动流程调整**  
@@ -102,7 +104,7 @@ app/src/main/java/net/micode/notes/
 
 | 成员 | 负责模块 | 新建/修改的文件 | 关键依赖 |
 |------|----------|-----------------|----------|
-| **成员 A**（账户） | `account` 包 + 相关 UI + 数据库用户表 | `account/User.java`、`account/AccountManager.java`、`ui/LoginActivity.java`、`ui/RegistrationActivity.java`、`ui/ForgotPasswordActivity.java`；**修改 `AndroidManifest.xml` 注册新 Activity** | 需要使用 `NotesDatabaseHelper` 新增 `user` 表；需要通过 `NotesProvider` 操作用户数据 |
+| **成员 A**（账户） | `account` 包 + 相关 UI + 数据库用户表 | `account/User.java`、`account/LocalAccountManager.java`、`ui/LoginActivity.java`、`ui/RegistrationActivity.java`、`ui/ForgotPasswordActivity.java`；**修改 `AndroidManifest.xml` 注册新 Activity** | 需要使用 `NotesDatabaseHelper` 新增 `user` 表；需要通过 `NotesProvider` 操作用户数据 |
 | **成员 B**（标签） | `tag` 包 + 标签管理 UI + 列表筛选改造 | `tag/Tag.java`、`tag/NoteTag.java`、`tag/TagManager.java`、`ui/TagManagementActivity.java`、`ui/TagSelectionDialog.java`；**修改 `NotesListActivity` 增加标签筛选栏** | 需要使用 `NotesDatabaseHelper` 新增 `tag`、`note_tag` 表；需要通过 `NotesProvider` 操作标签数据；需在 `NoteEditActivity` 中增加“添加标签”入口（可先预留） |
 | **成员 C**（图片） | `image` 包 + 编辑页图片功能改造 | `image/Image.java`、`image/ImageManager.java`；**修改 `NoteEditActivity`**（增加插入/删除/导出图片按钮、缩略图展示）、**修改 `AndroidManifest.xml` 添加权限** | 需要使用 `NotesDatabaseHelper` 新增 `image` 表；需要通过 `NotesProvider` 操作图片数据；需要相机/存储权限处理 |
 
