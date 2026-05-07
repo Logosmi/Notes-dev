@@ -1,20 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<!-- Copyright (c) 2010-2011, The MiCode Open Source Community (www.micode.net)
-
-     Licensed under the Apache License, Version 2.0 (the "License");
-     you may not use this file except in compliance with the License.
-     You may obtain a copy of the License at
-
-          http://www.apache.org/licenses/LICENSE-2.0
-
-     Unless required by applicable law or agreed to in writing, software
-     distributed under the License is distributed on an "AS IS" BASIS,
-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-     See the License for the specific language governing permissions and
-     limitations under the License.
--->
-
 <resources>
-    <color name="user_query_highlight">#335b5b5b</color>
+    <color name="primary">#6D7578</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#FFDBCA</color>
+    <color name="on_primary_container">#391000</color>
+    <color name="user_query_highlight">#FFFF00</color>
+
+    <color name="secondary">#FFB74D</color>
+    <color name="on_secondary">#000000</color>
+ 
+    <color name="background">#FFFFFF</color>
+    <color name="on_background">#1C1B1B</color>
+    <color name="surface">#FFFBF7</color>
+    <color name="on_surface">#1C1B1B</color>
+
+    <color name="error">#BA1A1A</color>
+    <color name="on_error">#FFFFFF</color>
 </resources>
+
+<!-- color = #6d7578 -->

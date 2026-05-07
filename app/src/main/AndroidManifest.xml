@@ -37,7 +37,7 @@
             android:name=".ui.LoginActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/NoteTheme"
+            android:theme="@style/AppTheme"
             android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -48,12 +48,12 @@
         <activity
             android:name=".ui.RegistrationActivity"
             android:label="注册"
-            android:theme="@style/NoteTheme" />
+            android:theme="@style/AppTheme" />
 
         <activity
             android:name=".ui.ForgotPasswordActivity"
             android:label="找回密码"
-            android:theme="@style/NoteTheme" />
+            android:theme="@style/AppTheme" />
 
         <activity
             android:name=".ui.NotesListActivity"
@@ -61,7 +61,7 @@
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:theme="@style/NoteTheme"
+            android:theme="@style/AppTheme"
             android:uiOptions="splitActionBarWhenNarrow"
             android:windowSoftInputMode="adjustPan" >
 
@@ -81,7 +81,7 @@
             android:exported="true"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:launchMode="singleTop"
-            android:theme="@style/NoteTheme" >
+            android:theme="@style/AppTheme" >
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

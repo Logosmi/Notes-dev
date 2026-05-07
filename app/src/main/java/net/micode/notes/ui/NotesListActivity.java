@@ -68,13 +68,17 @@ import androidx.work.Data;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
-import net.micode.notes.tool.BatchDeleteWorker;
-import net.micode.notes.tool.ExportTextWorker;
-
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
+import androidx.appcompat.app.AppCompatActivity;
+import android.net.Uri;
+import android.widget.ImageView;
 
+import com.google.android.material.appbar.MaterialToolbar;
+
+import net.micode.notes.tool.BatchDeleteWorker;
+import net.micode.notes.tool.ExportTextWorker;
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
@@ -93,8 +97,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashSet;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 
-public class NotesListActivity extends Activity implements OnClickListener, OnItemLongClickListener {
+public class NotesListActivity extends AppCompatActivity implements OnClickListener, OnItemLongClickListener {
     private static final int FOLDER_NOTE_LIST_QUERY_TOKEN = 0;
 
     private static final int FOLDER_LIST_QUERY_TOKEN      = 1;
@@ -121,7 +128,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     private boolean mIsSearchResult = false;
 
-    private Button mAddNewNote;
+    private View mAddNewNote;
 
     private boolean mDispatch;
 
@@ -155,6 +162,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     private final static int REQUEST_CODE_OPEN_NODE = 102;
     private final static int REQUEST_CODE_NEW_NODE  = 103;
+    private final static int REQUEST_PICK_BACKGROUND = 104;
 
     @Override
     protected void onNewIntent(Intent intent) {
@@ -189,15 +197,17 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         super.onCreate(savedInstanceState);
         setContentView(R.layout.note_list);
 
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             requestPermissions(new String[]{
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                // 如果未来用到录音、联系人等其他敏感权限，也可以在这里一并声明
             }, 1);
 }
         initResources();
-
+        loadBackground();
         /**
          * Insert an introduction when user firstly use this application
          */
@@ -207,9 +217,22 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == RESULT_OK
-                && (requestCode == REQUEST_CODE_OPEN_NODE || requestCode == REQUEST_CODE_NEW_NODE)) {
-            mNotesListAdapter.changeCursor(null);
+        if (resultCode == RESULT_OK) {
+            if (requestCode == REQUEST_CODE_OPEN_NODE || requestCode == REQUEST_CODE_NEW_NODE) {
+                mNotesListAdapter.changeCursor(null);
+            } else if (requestCode == REQUEST_PICK_BACKGROUND) {
+                Uri sourceUri = data.getData();
+                String savedPath = copyImageToInternal(sourceUri);
+                if (savedPath != null) {
+                    PreferenceManager.getDefaultSharedPreferences(this)
+                            .edit()
+                            .putString("background_uri", savedPath)
+                            .apply();
+                    loadBackground();
+                } else {
+                    Toast.makeText(this, "Failed to set background", Toast.LENGTH_SHORT).show();
+                }
+            }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }
@@ -278,9 +301,9 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         mNotesListView.setOnItemLongClickListener(this);
         mNotesListAdapter = new NotesListAdapter(this);
         mNotesListView.setAdapter(mNotesListAdapter);
-        mAddNewNote = (Button) findViewById(R.id.btn_new_note);
+        mAddNewNote = findViewById(R.id.btn_new_note);
         mAddNewNote.setOnClickListener(this);
-        mAddNewNote.setOnTouchListener(new NewNoteOnTouchListener());
+        // mAddNewNote.setOnTouchListener(new NewNoteOnTouchListener());
         mDispatch = false;
         mDispatchY = 0;
         mOriginY = 0;
@@ -838,9 +861,13 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
             createNewNote();
         } else if (itemId == R.id.menu_search) {
             onSearchRequested();
+        } else if (itemId == R.id.menu_set_background) {
+            pickBackground();
+        } else if (itemId == R.id.menu_clear_background) {
+            clearBackground();
         } else {
             return super.onOptionsItemSelected(item);
-        }
+        } 
         return true;
     }
 
@@ -996,6 +1023,58 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         super.onDestroy();
         if (mExportWorkInfoLiveData != null) {
             mExportWorkInfoLiveData.removeObserver(mExportObserver);
+        }
+    }
+
+    private void loadBackground() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
+        String bgUri = sp.getString("background_uri", "");
+        ImageView ivBg = findViewById(R.id.iv_background);
+        if (ivBg == null) return;
+        if (!TextUtils.isEmpty(bgUri)) {
+            ivBg.setImageURI(Uri.parse(bgUri));
+            ivBg.setVisibility(View.VISIBLE);
+        } else {
+            ivBg.setVisibility(View.GONE);
+        }
+    }
+
+
+    private void pickBackground() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        startActivityForResult(intent, REQUEST_PICK_BACKGROUND);
+    }
+
+    private void clearBackground() {
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .edit()
+                .remove("background_uri")
+                .apply();
+        loadBackground();
+    }
+
+    private String copyImageToInternal(Uri sourceUri) {
+        try {
+            File bgDir = new File(getFilesDir(), "backgrounds");
+            if (!bgDir.exists()) bgDir.mkdirs();
+            String fileName = "bg_" + System.currentTimeMillis() + ".jpg";
+            File destFile = new File(bgDir, fileName);
+
+            InputStream in = getContentResolver().openInputStream(sourceUri);
+            FileOutputStream out = new FileOutputStream(destFile);
+            byte[] buffer = new byte[1024];
+            int len;
+            while ((len = in.read(buffer)) > 0) {
+                out.write(buffer, 0, len);
+            }
+            out.close();
+            in.close();
+            return destFile.getAbsolutePath();
+        } catch (Exception e) {
+            Log.e(TAG, "Copy background image failed", e);
+            return null;
         }
     }
 }

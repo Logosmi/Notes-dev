@@ -1,39 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
-<!-- Copyright (c) 2010-2011, The MiCode Open Source Community (www.micode.net)
+    <item
+        android:id="@+id/menu_new_note"
+        android:icon="@android:drawable/ic_input_add"
+        android:title="@string/menu_new_note"
+        app:showAsAction="never" />
 
-     Licensed under the Apache License, Version 2.0 (the "License");
-     you may not use this file except in compliance with the License.
-     You may obtain a copy of the License at
-
-          http://www.apache.org/licenses/LICENSE-2.0
-
-     Unless required by applicable law or agreed to in writing, software
-     distributed under the License is distributed on an "AS IS" BASIS,
-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-     See the License for the specific language governing permissions and
-     limitations under the License.
--->
-
-<menu
-    xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/menu_new_folder"
-        android:title="@string/menu_create_folder"/>
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="@string/menu_create_folder"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_export_text"
-        android:title="@string/menu_export_text"/>
+        android:icon="@android:drawable/ic_menu_save"
+        android:title="@string/menu_export_text"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_sync"
-        android:title="@string/menu_sync"/>
+        android:icon="@android:drawable/ic_popup_sync"
+        android:title="@string/menu_sync"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_setting"
-        android:title="@string/menu_setting" />
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="@string/menu_setting"
+        app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_set_background"
+        android:title="@string/menu_set_background"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_clear_background"
+        android:title="@string/menu_clear_background"
+        app:showAsAction="never" />
+        
+    <item
         android:id="@+id/menu_search"
-        android:title="@string/menu_search"/>
+        android:icon="@android:drawable/ic_menu_search"
+        android:title="@string/menu_search"
+        app:showAsAction="ifRoom" />
+
 </menu>

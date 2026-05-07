@@ -1,0 +1,26 @@
+<resources>
+    <!-- 日间主题 -->
+    <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorOnSecondary">@color/on_secondary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorError">@color/error</item>
+        <item name="colorOnError">@color/on_error</item>
+
+        <!-- 用系统窗口背景替代 colorBackground -->
+        <item name="android:windowBackground">@color/background</item>
+
+        <item name="shapeAppearance">?attr/shapeAppearanceCornerMedium</item>
+        <item name="shapeAppearanceSmallComponent">?attr/shapeAppearanceCornerSmall</item>
+        <item name="shapeAppearanceMediumComponent">?attr/shapeAppearanceCornerMedium</item>
+        <item name="shapeAppearanceLargeComponent">?attr/shapeAppearanceCornerLarge</item>
+
+        <item name="materialButtonStyle">@style/Widget.Material3.Button</item>
+        <item name="materialCardViewStyle">@style/Widget.Material3.CardView.Elevated</item>
+    </style>
+</resources>

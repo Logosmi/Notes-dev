@@ -24,6 +24,8 @@
     <string name="widget_under_visit_mode">Privacy mode，can not see note content</string>
     <string name="notelist_string_info">...</string>
     <string name="notelist_menu_new">Add note</string>
+    <string name="menu_set_background">Set background</string>
+    <string name="menu_clear_background">Clear background</string>
     <string name="delete_remind_time_message">Delete reminder successfully</string>
     <string name="set_remind_time_message">Set reminder</string>
     <string name="note_alert_expired">Expired</string>
@@ -40,6 +42,7 @@
     <string name="file_name_txt_format">notes_%s.txt</string>
     <!-- notes list string -->
     <string name="format_folder_files_count">(%d)</string>
+    <string name="menu_new_note">New Note</string>
     <string name="menu_create_folder">New Folder</string>
     <string name="menu_export_text">Export text</string>
     <string name="menu_sync">Sync</string>
