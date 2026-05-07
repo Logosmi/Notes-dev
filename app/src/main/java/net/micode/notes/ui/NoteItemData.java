@@ -27,7 +27,7 @@ import net.micode.notes.tool.DataUtils;
 
 
 public class NoteItemData {
-    static final String [] PROJECTION = new String [] {
+    public static final String [] PROJECTION = new String [] {
         NoteColumns.ID,
         NoteColumns.ALERTED_DATE,
         NoteColumns.BG_COLOR_ID,

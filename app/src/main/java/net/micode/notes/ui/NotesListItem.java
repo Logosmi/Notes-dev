@@ -101,6 +101,11 @@ public class NotesListItem extends LinearLayout {
 
     private void setBackground(NoteItemData data) {
         int id = data.getBgColorId();
+        // if (id < 0 || id >= NoteItemBgResources.getCount()) {
+        //     setBackgroundResource(android.R.color.white);
+        //     return;
+        // }
+
         if (data.getType() == Notes.TYPE_NOTE) {
             if (data.isSingle() || data.isOneFollowingFolder()) {
                 setBackgroundResource(NoteItemBgResources.getNoteBgSingleRes(id));
