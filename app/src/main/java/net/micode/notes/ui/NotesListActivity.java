@@ -155,6 +155,10 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     private final static int REQUEST_CODE_OPEN_NODE = 102;
     private final static int REQUEST_CODE_NEW_NODE  = 103;
 
+    private TagManager tagManager;
+    private LinearLayout tagFilterContainer;
+    private long currentFilterTagId = -1; // -1 表示全部
+
     @Override
     protected void onNewIntent(Intent intent) {
         setIntent(intent);
@@ -187,6 +191,9 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.note_list);
+        tagManager = new TagManager(this);
+        tagFilterContainer = findViewById(R.id.tag_filter_container);
+        buildTagFilterChips();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             requestPermissions(new String[]{
@@ -1012,6 +1019,36 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         super.onDestroy();
         if (mExportWorkInfoLiveData != null) {
             mExportWorkInfoLiveData.removeObserver(mExportObserver);
+        }
+    }
+    private void buildTagFilterChips() {
+        tagFilterContainer.removeAllViews();
+        // “全部”芯片
+        Chip chipAll = new Chip(this);
+        chipAll.setText(R.string.tag_filter_all);
+        chipAll.setChipBackgroundColorResource(R.color.chip_default);
+        chipAll.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                currentFilterTagId = -1;
+                refreshNotesList(); // 加载所有便签
+            }
+        });
+        tagFilterContainer.addView(chipAll);
+
+        List<Tag> tags = tagManager.getAllTags();
+        for (final Tag tag : tags) {
+            Chip chip = new Chip(this);
+            chip.setText(tag.getName());
+            chip.setChipBackgroundColorResource(R.color.chip_default);
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    currentFilterTagId = tag.getId();
+                    refreshNotesList(); // 根据标签筛选便签
+                }
+            });
+            tagFilterContainer.addView(chip);
         }
     }
 }
