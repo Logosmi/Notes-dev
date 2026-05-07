@@ -377,28 +377,26 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
                 return true;
             }
 
-            switch (item.getItemId()) {
-                case R.id.delete:
-                    AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
-                    builder.setTitle(getString(R.string.alert_title_delete));
-                    builder.setIcon(android.R.drawable.ic_dialog_alert);
-                    builder.setMessage(getString(R.string.alert_message_delete_notes,
-                                             mNotesListAdapter.getSelectedCount()));
-                    builder.setPositiveButton(android.R.string.ok,
-                                             new DialogInterface.OnClickListener() {
-                                                 public void onClick(DialogInterface dialog,
-                                                         int which) {
-                                                     batchDelete();
-                                                 }
-                                             });
-                    builder.setNegativeButton(android.R.string.cancel, null);
-                    builder.show();
-                    break;
-                case R.id.move:
-                    startQueryDestinationFolders();
-                    break;
-                default:
-                    return false;
+            int itemId = item.getItemId();
+            if (itemId == R.id.delete) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
+                builder.setTitle(getString(R.string.alert_title_delete));
+                builder.setIcon(android.R.drawable.ic_dialog_alert);
+                builder.setMessage(getString(R.string.alert_message_delete_notes,
+                                         mNotesListAdapter.getSelectedCount()));
+                builder.setPositiveButton(android.R.string.ok,
+                                         new DialogInterface.OnClickListener() {
+                                             public void onClick(DialogInterface dialog,
+                                                     int which) {
+                                                 batchDelete();
+                                             }
+                                         });
+                builder.setNegativeButton(android.R.string.cancel, null);
+                builder.show();
+            } else if (itemId == R.id.move) {
+                startQueryDestinationFolders();
+            } else {
+                return false;
             }
             return true;
         }
@@ -595,12 +593,8 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     }
 
     public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.btn_new_note:
-                createNewNote();
-                break;
-            default:
-                break;
+        if (v.getId() == R.id.btn_new_note) {
+            createNewNote();
         }
     }
 
@@ -823,40 +817,29 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.menu_new_folder: {
-                showCreateOrModifyFolderDialog(true);
-                break;
-            }
-            case R.id.menu_export_text: {
-                exportNoteToText();
-                break;
-            }
-            case R.id.menu_sync: {
-                if (isSyncMode()) {
-                    if (TextUtils.equals(item.getTitle(), getString(R.string.menu_sync))) {
-                        GTaskSyncService.startSync(this);
-                    } else {
-                        GTaskSyncService.cancelSync(this);
-                    }
+        int itemId = item.getItemId();
+        if (itemId == R.id.menu_new_folder) {
+            showCreateOrModifyFolderDialog(true);
+        } else if (itemId == R.id.menu_export_text) {
+            exportNoteToText();
+        } else if (itemId == R.id.menu_sync) {
+            if (isSyncMode()) {
+                if (TextUtils.equals(item.getTitle(), getString(R.string.menu_sync))) {
+                    GTaskSyncService.startSync(this);
                 } else {
-                    startPreferenceActivity();
+                    GTaskSyncService.cancelSync(this);
                 }
-                break;
-            }
-            case R.id.menu_setting: {
+            } else {
                 startPreferenceActivity();
-                break;
             }
-            case R.id.menu_new_note: {
-                createNewNote();
-                break;
-            }
-            case R.id.menu_search:
-                onSearchRequested();
-                break;
-            default:
-                break;
+        } else if (itemId == R.id.menu_setting) {
+            startPreferenceActivity();
+        } else if (itemId == R.id.menu_new_note) {
+            createNewNote();
+        } else if (itemId == R.id.menu_search) {
+            onSearchRequested();
+        } else {
+            return super.onOptionsItemSelected(item);
         }
         return true;
     }
