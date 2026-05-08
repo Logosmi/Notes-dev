@@ -51,6 +51,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ImageButton;
+import android.widget.PopupMenu;
 
 import android.os.Build;
 import android.provider.Settings;
@@ -84,7 +86,8 @@ public class NoteEditActivity extends Activity implements OnClickListener,
 
         public TextView tvAlertDate;
 
-        public ImageView ibSetBgColor;
+        // public ImageView ibSetBgColor;
+
     }
 
     private static final Map<Integer, Integer> sBgSelectorBtnsMap = new HashMap<Integer, Integer>();
@@ -151,6 +154,7 @@ public class NoteEditActivity extends Activity implements OnClickListener,
 
     private String mUserQuery;
     private Pattern mPattern;
+    private TextView mMenuMore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -372,11 +376,11 @@ public class NoteEditActivity extends Activity implements OnClickListener,
         mNoteHeaderHolder.tvModified = (TextView) findViewById(R.id.tv_modified_date);
         mNoteHeaderHolder.ivAlertIcon = (ImageView) findViewById(R.id.iv_alert_icon);
         mNoteHeaderHolder.tvAlertDate = (TextView) findViewById(R.id.tv_alert_date);
-        mNoteHeaderHolder.ibSetBgColor = (ImageView) findViewById(R.id.btn_set_bg_color);
-        mNoteHeaderHolder.ibSetBgColor.setOnClickListener(this);
         mNoteEditor = (EditText) findViewById(R.id.note_edit_view);
         mNoteEditorPanel = findViewById(R.id.sv_note_edit);
         mNoteBgColorSelector = findViewById(R.id.note_bg_color_selector);
+        mMenuMore = findViewById(R.id.menu_more);
+        mMenuMore.setOnClickListener(v -> showOverflowMenu());
         for (int id : sBgSelectorBtnsMap.keySet()) {
             ImageView iv = (ImageView) findViewById(id);
             iv.setOnClickListener(this);
@@ -430,11 +434,7 @@ public class NoteEditActivity extends Activity implements OnClickListener,
 
     public void onClick(View v) {
         int id = v.getId();
-        if (id == R.id.btn_set_bg_color) {
-            mNoteBgColorSelector.setVisibility(View.VISIBLE);
-            findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
-                    -                    View.VISIBLE);
-        } else if (sBgSelectorBtnsMap.containsKey(id)) {
+        if (sBgSelectorBtnsMap.containsKey(id)) {
             findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
                     View.GONE);
             mWorkingNote.setBgColorId(sBgSelectorBtnsMap.get(id));
@@ -484,34 +484,13 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     }
 
     @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
-        if (isFinishing()) {
-            return true;
-        }
-        clearSettingState();
-        menu.clear();
-        if (mWorkingNote.getFolderId() == Notes.ID_CALL_RECORD_FOLDER) {
-            getMenuInflater().inflate(R.menu.call_note_edit, menu);
-        } else {
-            getMenuInflater().inflate(R.menu.note_edit, menu);
-        }
-        if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
-            menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_normal_mode);
-        } else {
-            menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_list_mode);
-        }
-        if (mWorkingNote.hasClockAlert()) {
-            menu.findItem(R.id.menu_alert).setVisible(false);
-        } else {
-            menu.findItem(R.id.menu_delete_remind).setVisible(false);
-        }
-        return true;
-    }
-
-    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.menu_new_note) {
+        if (id == R.id.menu_bg_color) {
+            mNoteBgColorSelector.setVisibility(View.VISIBLE);
+            findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(View.VISIBLE);
+            return true;
+        } else if (id == R.id.menu_new_note) {
             createNewNote();
         } else if (id == R.id.menu_delete) {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -867,5 +846,36 @@ public class NoteEditActivity extends Activity implements OnClickListener,
 
     private void showToast(int resId, int duration) {
         Toast.makeText(this, resId, duration).show();
+    }
+
+    private void showOverflowMenu() {
+        PopupMenu popup = new PopupMenu(this, mMenuMore);
+        Menu menu = popup.getMenu();
+        
+        if (mWorkingNote.getFolderId() == Notes.ID_CALL_RECORD_FOLDER) {
+            getMenuInflater().inflate(R.menu.call_note_edit, menu);
+        } else {
+            getMenuInflater().inflate(R.menu.note_edit, menu);
+        }
+
+        menu.add(Menu.NONE, R.id.menu_bg_color, 0, "背景颜色");
+
+        if (mWorkingNote.getCheckListMode() == TextNote.MODE_CHECK_LIST) {
+            menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_normal_mode);
+        } else {
+            menu.findItem(R.id.menu_list_mode).setTitle(R.string.menu_list_mode);
+        }
+        if (mWorkingNote.hasClockAlert()) {
+            menu.findItem(R.id.menu_alert).setVisible(false);
+        } else {
+            menu.findItem(R.id.menu_delete_remind).setVisible(false);
+        }
+        
+        popup.setOnMenuItemClickListener(item -> {
+            onOptionsItemSelected(item);
+            return true;
+        });
+        
+        popup.show();
     }
 }

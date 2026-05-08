@@ -17,18 +17,15 @@ public class ForgotPasswordActivity extends Activity {
     private LocalAccountManager accountManager;
     private String currentUsername = null;
 
-    // Step 1
     private LinearLayout step1;
     private EditText etUsername;
     private Button btnGetQuestion;
 
-    // Step 2
     private LinearLayout step2;
     private TextView tvQuestion;
     private EditText etAnswer;
     private Button btnCheckAnswer;
 
-    // Step 3
     private LinearLayout step3;
     private EditText etNewPass, etConfirmNewPass;
     private Button btnReset;

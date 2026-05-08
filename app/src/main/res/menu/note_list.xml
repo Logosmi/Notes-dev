@@ -3,12 +3,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/menu_new_note"
-        android:icon="@android:drawable/ic_input_add"
-        android:title="@string/menu_new_note"
-        app:showAsAction="never" />
-
-    <item
         android:id="@+id/menu_new_folder"
         android:icon="@android:drawable/ic_menu_add"
         android:title="@string/menu_create_folder"
@@ -21,27 +15,11 @@
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/menu_sync"
-        android:icon="@android:drawable/ic_popup_sync"
-        android:title="@string/menu_sync"
-        app:showAsAction="never" />
-
-    <item
         android:id="@+id/menu_setting"
         android:icon="@android:drawable/ic_menu_preferences"
         android:title="@string/menu_setting"
         app:showAsAction="never" />
 
-    <item
-        android:id="@+id/menu_set_background"
-        android:title="@string/menu_set_background"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_clear_background"
-        android:title="@string/menu_clear_background"
-        app:showAsAction="never" />
-        
     <item
         android:id="@+id/menu_search"
         android:icon="@android:drawable/ic_menu_search"

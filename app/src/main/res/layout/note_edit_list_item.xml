@@ -35,5 +35,6 @@
         android:lineSpacingMultiplier="1.2"
         android:layout_gravity="center_vertical"
         android:textAppearance="@style/TextAppearancePrimaryItem"
+        android:paddingLeft="6dip"
         android:background="@null" />
 </LinearLayout>

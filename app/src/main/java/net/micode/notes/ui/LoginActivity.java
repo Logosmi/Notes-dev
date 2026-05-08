@@ -24,7 +24,6 @@ public class LoginActivity extends Activity {
         setContentView(R.layout.activity_login);
         accountManager = new LocalAccountManager(this);
 
-        // 如果已经登录，直接进入主界面
         if (accountManager.isLoggedIn()) {
             goToMain();
             return;

@@ -164,9 +164,9 @@
 
         <activity
             android:name="net.micode.notes.ui.NotesPreferenceActivity"
+            android:theme="@style/AppTheme"
             android:label="@string/preferences_title"
-            android:launchMode="singleTop"
-            android:theme="@android:style/Theme.Holo.Light" >
+            android:launchMode="singleTop" >
         </activity>
 
         <service
@@ -176,6 +176,6 @@
 
         <meta-data
             android:name="android.app.default_searchable"
-            android:value=".ui.NoteEditActivity" />
+            android:value=".ui.NoteListActivity" />
     </application>
 </manifest>
