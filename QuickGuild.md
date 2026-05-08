@@ -15,10 +15,6 @@ adb devices
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
-## 调试错误
-```bash
-adb logcat -d *:E | grep -E "net.micode.notes|AndroidRuntime|FATAL EXCEPTION" | grep "^05-07" > crash.log
-```
 
 # Git
 branch_name 替换为实际分支名称

@@ -20,12 +20,14 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.appwidget.AppWidgetManager;
+import android.content.AsyncQueryHandler;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -57,8 +59,6 @@ import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.net.Uri;
-import android.widget.ImageView;
 
 import android.os.Build;
 import android.Manifest;
@@ -72,7 +72,8 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.lifecycle.ViewModelProvider;
+import android.net.Uri;
+import android.widget.ImageView;
 
 import com.google.android.material.appbar.MaterialToolbar;
 
@@ -90,7 +91,6 @@ import net.micode.notes.ui.NotesListAdapter.AppWidgetAttribute;
 import net.micode.notes.widget.NoteWidgetProvider_2x;
 import net.micode.notes.widget.NoteWidgetProvider_4x;
 import net.micode.notes.account.LocalAccountManager;
-import net.micode.notes.data.NoteRepository;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -100,10 +100,11 @@ import java.util.HashSet;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.util.List;
-import java.util.ArrayList;
 
 public class NotesListActivity extends AppCompatActivity implements OnClickListener, OnItemLongClickListener {
+    private static final int FOLDER_NOTE_LIST_QUERY_TOKEN = 0;
+
+    private static final int FOLDER_LIST_QUERY_TOKEN      = 1;
 
     private static final int MENU_FOLDER_DELETE = 0;
 
@@ -118,6 +119,8 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     };
 
     private ListEditState mState;
+
+    private BackgroundQueryHandler mBackgroundQueryHandler;
 
     private NotesListAdapter mNotesListAdapter;
 
@@ -135,9 +138,9 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
 
     private TextView mTitleBar;
 
-    private NotesListViewModel viewModel;
-
     private long mCurrentFolderId;
+
+    private ContentResolver mContentResolver;
 
     private ModeCallback mModeCallBack;
 
@@ -149,6 +152,13 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     public static final int NOTES_LISTVIEW_SCROLL_RATE = 30;
 
     private NoteItemData mFocusNoteDataItem;
+
+    private static final String NORMAL_SELECTION = NoteColumns.PARENT_ID + "=?";
+
+    private static final String ROOT_FOLDER_SELECTION = "(" + NoteColumns.TYPE + "<>"
+            + Notes.TYPE_SYSTEM + " AND " + NoteColumns.PARENT_ID + "=?)" + " OR ("
+            + NoteColumns.ID + "=" + Notes.ID_CALL_RECORD_FOLDER + " AND "
+            + NoteColumns.NOTES_COUNT + ">0)";
 
     private final static int REQUEST_CODE_OPEN_NODE = 102;
     private final static int REQUEST_CODE_NEW_NODE  = 103;
@@ -163,10 +173,22 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         }
     }
 
-   private void handleIntent(Intent intent) {
+    private void handleIntent(Intent intent) {
         if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
-            final String query = intent.getStringExtra(SearchManager.QUERY);
-            viewModel.searchNotes(query);
+            mIsSearchResult = true;
+            String query = intent.getStringExtra(SearchManager.QUERY);
+
+            String selection = NoteColumns.SNIPPET + " LIKE ? AND (" +
+                            NoteColumns.TYPE + "=? OR " + NoteColumns.TYPE + "=?)";
+            String[] selectionArgs = new String[] {
+                "%" + query + "%",
+                String.valueOf(Notes.TYPE_NOTE),
+                String.valueOf(Notes.TYPE_FOLDER)
+            };
+
+            mBackgroundQueryHandler.startQuery(FOLDER_NOTE_LIST_QUERY_TOKEN, null,
+                    Notes.CONTENT_NOTE_URI, NoteItemData.PROJECTION, selection,
+                    selectionArgs, NoteColumns.TYPE + " DESC," + NoteColumns.MODIFIED_DATE + " DESC");
         }
     }
      
@@ -183,10 +205,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
             }, 1);
-        }
-
-        viewModel = new ViewModelProvider(this).get(NotesListViewModel.class);
-
+}
         initResources();
         loadBackground();
         /**
@@ -194,39 +213,25 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
          */
         setAppInfoFromRawRes();
         handleIntent(getIntent());
-
-
-        viewModel.getNoteList().observe(this, list -> {
-            mNotesListAdapter.setNoteList(list);
-            mNotesListAdapter.notifyDataSetChanged();
-        });
-
-        viewModel.getCurrentFolderId().observe(this, folderId -> {
-            mCurrentFolderId = folderId;
-        });
-
-        viewModel.isSearchMode().observe(this, isSearch -> {
-            mIsSearchResult = isSearch != null && isSearch;
-        });
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (resultCode == RESULT_OK) {
             if (requestCode == REQUEST_CODE_OPEN_NODE || requestCode == REQUEST_CODE_NEW_NODE) {
-                viewModel.loadNotes(viewModel.getCurrentFolderId().getValue());
-                } else if (requestCode == REQUEST_PICK_BACKGROUND) {
-                    Uri sourceUri = data.getData();
-                    String savedPath = copyImageToInternal(sourceUri);
-                    if (savedPath != null) {
-                        PreferenceManager.getDefaultSharedPreferences(this)
-                                .edit()
-                                .putString("background_uri", savedPath)
-                                .apply();
-                        loadBackground();
-                    } else {
-                        Toast.makeText(this, "Failed to set background", Toast.LENGTH_SHORT).show();
-                    }
+                mNotesListAdapter.changeCursor(null);
+            } else if (requestCode == REQUEST_PICK_BACKGROUND) {
+                Uri sourceUri = data.getData();
+                String savedPath = copyImageToInternal(sourceUri);
+                if (savedPath != null) {
+                    PreferenceManager.getDefaultSharedPreferences(this)
+                            .edit()
+                            .putString("background_uri", savedPath)
+                            .apply();
+                    loadBackground();
+                } else {
+                    Toast.makeText(this, "Failed to set background", Toast.LENGTH_SHORT).show();
+                }
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
@@ -282,9 +287,12 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     @Override
     protected void onStart() {
         super.onStart();
+        startAsyncNotesListQuery();
     }
 
     private void initResources() {
+        mContentResolver = this.getContentResolver();
+        mBackgroundQueryHandler = new BackgroundQueryHandler(this.getContentResolver());
         mCurrentFolderId = Notes.ID_ROOT_FOLDER;
         mNotesListView = (ListView) findViewById(R.id.notes_list);
         mNotesListView.addFooterView(LayoutInflater.from(this).inflate(R.layout.note_list_footer, null),
@@ -295,6 +303,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         mNotesListView.setAdapter(mNotesListAdapter);
         mAddNewNote = findViewById(R.id.btn_new_note);
         mAddNewNote.setOnClickListener(this);
+        // mAddNewNote.setOnTouchListener(new NewNoteOnTouchListener());
         mDispatch = false;
         mDispatchY = 0;
         mOriginY = 0;
@@ -313,7 +322,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
             menu.findItem(R.id.delete).setOnMenuItemClickListener(this);
             mMoveMenu = menu.findItem(R.id.move);
             if (mFocusNoteDataItem.getParentId() == Notes.ID_CALL_RECORD_FOLDER
-                    || DataUtils.getUserFolderCount(getContentResolver()) == 0) {
+                    || DataUtils.getUserFolderCount(mContentResolver) == 0) {
                 mMoveMenu.setVisible(false);
             } else {
                 mMoveMenu.setVisible(true);
@@ -416,22 +425,118 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         }
     }
 
-    private void showFolderListMenu(final List<NoteRepository.FolderItem> folders) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.menu_title_select_folder);
-        String[] names = new String[folders.size()];
-        for (int i = 0; i < folders.size(); i++) {
-            names[i] = folders.get(i).name;
+    private class NewNoteOnTouchListener implements OnTouchListener {
+
+        public boolean onTouch(View v, MotionEvent event) {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN: {
+                    Display display = getWindowManager().getDefaultDisplay();
+                    int screenHeight = display.getHeight();
+                    int newNoteViewHeight = mAddNewNote.getHeight();
+                    int start = screenHeight - newNoteViewHeight;
+                    int eventY = start + (int) event.getY();
+                    /**
+                     * Minus TitleBar's height
+                     */
+                    if (mState == ListEditState.SUB_FOLDER) {
+                        eventY -= mTitleBar.getHeight();
+                        start -= mTitleBar.getHeight();
+                    }
+                    /**
+                     * HACKME:When click the transparent part of "New Note" button, dispatch
+                     * the event to the list view behind this button. The transparent part of
+                     * "New Note" button could be expressed by formula y=-0.12x+94（Unit:pixel）
+                     * and the line top of the button. The coordinate based on left of the "New
+                     * Note" button. The 94 represents maximum height of the transparent part.
+                     * Notice that, if the background of the button changes, the formula should
+                     * also change. This is very bad, just for the UI designer's strong requirement.
+                     */
+                    if (event.getY() < (event.getX() * (-0.12) + 94)) {
+                        View view = mNotesListView.getChildAt(mNotesListView.getChildCount() - 1
+                                - mNotesListView.getFooterViewsCount());
+                        if (view != null && view.getBottom() > start
+                                && (view.getTop() < (start + 94))) {
+                            mOriginY = (int) event.getY();
+                            mDispatchY = eventY;
+                            event.setLocation(event.getX(), mDispatchY);
+                            mDispatch = true;
+                            return mNotesListView.dispatchTouchEvent(event);
+                        }
+                    }
+                    break;
+                }
+                case MotionEvent.ACTION_MOVE: {
+                    if (mDispatch) {
+                        mDispatchY += (int) event.getY() - mOriginY;
+                        event.setLocation(event.getX(), mDispatchY);
+                        return mNotesListView.dispatchTouchEvent(event);
+                    }
+                    break;
+                }
+                default: {
+                    if (mDispatch) {
+                        event.setLocation(event.getX(), mDispatchY);
+                        mDispatch = false;
+                        return mNotesListView.dispatchTouchEvent(event);
+                    }
+                    break;
+                }
+            }
+            return false;
         }
-        builder.setItems(names, (dialog, which) -> {
-            long targetId = folders.get(which).id;
-            List<Long> ids = mNotesListAdapter.getSelectedItemIds();
-            viewModel.moveNotes(ids, targetId);
-            Toast.makeText(NotesListActivity.this,
-                    getString(R.string.format_move_notes_to_folder,
-                            ids.size(), folders.get(which).name),
-                    Toast.LENGTH_SHORT).show();
-            mModeCallBack.finishActionMode();
+
+    };
+
+    private void startAsyncNotesListQuery() {
+        String selection = (mCurrentFolderId == Notes.ID_ROOT_FOLDER) ? ROOT_FOLDER_SELECTION
+                : NORMAL_SELECTION;
+        mBackgroundQueryHandler.startQuery(FOLDER_NOTE_LIST_QUERY_TOKEN, null,
+                Notes.CONTENT_NOTE_URI, NoteItemData.PROJECTION, selection, new String[] {
+                    String.valueOf(mCurrentFolderId)
+                }, NoteColumns.TYPE + " DESC," + NoteColumns.MODIFIED_DATE + " DESC");
+    }
+
+    private final class BackgroundQueryHandler extends AsyncQueryHandler {
+        public BackgroundQueryHandler(ContentResolver contentResolver) {
+            super(contentResolver);
+        }
+
+        @Override
+        protected void onQueryComplete(int token, Object cookie, Cursor cursor) {
+            switch (token) {
+                case FOLDER_NOTE_LIST_QUERY_TOKEN:
+                    mNotesListAdapter.changeCursor(cursor);
+                    break;
+                case FOLDER_LIST_QUERY_TOKEN:
+                    if (cursor != null && cursor.getCount() > 0) {
+                        showFolderListMenu(cursor);
+                    } else {
+                        Log.e(TAG, "Query folder failed");
+                    }
+                    break;
+                default:
+                    return;
+            }
+        }
+    }
+
+    private void showFolderListMenu(Cursor cursor) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
+        builder.setTitle(R.string.menu_title_select_folder);
+        final FoldersListAdapter adapter = new FoldersListAdapter(this, cursor);
+        builder.setAdapter(adapter, new DialogInterface.OnClickListener() {
+
+            public void onClick(DialogInterface dialog, int which) {
+                DataUtils.batchMoveToFolder(mContentResolver,
+                        mNotesListAdapter.getSelectedItemIds(), adapter.getItemId(which));
+                Toast.makeText(
+                        NotesListActivity.this,
+                        getString(R.string.format_move_notes_to_folder,
+                                mNotesListAdapter.getSelectedCount(),
+                                adapter.getFolderName(NotesListActivity.this, which)),
+                        Toast.LENGTH_SHORT).show();
+                mModeCallBack.finishActionMode();
+            }
         });
         builder.show();
     }
@@ -444,9 +549,19 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     }
 
     private void batchDelete() {
-        List<Long> ids = mNotesListAdapter.getSelectedItemIds();
-        viewModel.deleteNotes(ids);
-        mModeCallBack.finishActionMode();
+        long[] itemIds = mNotesListAdapter.getSelectedItemIds()
+                .stream().mapToLong(Long::longValue).toArray();
+
+        Data inputData = new Data.Builder()
+                .putLongArray(BatchDeleteWorker.KEY_ITEM_IDS, itemIds)
+                .build();
+
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(BatchDeleteWorker.class)
+                .setInputData(inputData)
+                .build();
+
+        WorkManager.getInstance(this).enqueue(request);
+        mModeCallBack.finishActionMode();   // 立即退出多选模式
     }
 
     private void deleteFolder(long folderId) {
@@ -457,14 +572,14 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
 
         HashSet<Long> ids = new HashSet<Long>();
         ids.add(folderId);
-        HashSet<AppWidgetAttribute> widgets = DataUtils.getFolderNoteWidget(getContentResolver(),
+        HashSet<AppWidgetAttribute> widgets = DataUtils.getFolderNoteWidget(mContentResolver,
                 folderId);
         if (!isSyncMode()) {
             // if not synced, delete folder directly
-            DataUtils.batchDeleteNotes(getContentResolver(), ids);
+            DataUtils.batchDeleteNotes(mContentResolver, ids);
         } else {
             // in sync mode, we'll move the deleted folder into the trash folder
-            DataUtils.batchMoveToFolder(getContentResolver(), ids, Notes.ID_TRASH_FOLER);
+            DataUtils.batchMoveToFolder(mContentResolver, ids, Notes.ID_TRASH_FOLER);
         }
         if (widgets != null) {
             for (AppWidgetAttribute widget : widgets) {
@@ -474,11 +589,6 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
                 }
             }
         }
-
-        viewModel.loadNotes(Notes.ID_ROOT_FOLDER);
-        mState = ListEditState.NOTE_LIST;
-        mTitleBar.setVisibility(View.GONE);
-        mAddNewNote.setVisibility(View.VISIBLE);
     }
 
     private void openNode(NoteItemData data) {
@@ -489,14 +599,17 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     }
 
     private void openFolder(NoteItemData data) {
-        long folderId = data.getId();
-        viewModel.loadNotes(folderId);
-        if (folderId == Notes.ID_CALL_RECORD_FOLDER) {
+        mCurrentFolderId = data.getId();
+        startAsyncNotesListQuery();
+        if (data.getId() == Notes.ID_CALL_RECORD_FOLDER) {
             mState = ListEditState.CALL_RECORD_FOLDER;
             mAddNewNote.setVisibility(View.GONE);
-            mTitleBar.setText(R.string.call_record_folder_name);
         } else {
             mState = ListEditState.SUB_FOLDER;
+        }
+        if (data.getId() == Notes.ID_CALL_RECORD_FOLDER) {
+            mTitleBar.setText(R.string.call_record_folder_name);
+        } else {
             mTitleBar.setText(data.getSnippet());
         }
         mTitleBar.setVisibility(View.VISIBLE);
@@ -551,7 +664,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
             public void onClick(View v) {
                 hideSoftInput(etName);
                 String name = etName.getText().toString();
-                if (DataUtils.checkVisibleFolderName(getContentResolver(), name)) {
+                if (DataUtils.checkVisibleFolderName(mContentResolver, name)) {
                     Toast.makeText(NotesListActivity.this, getString(R.string.folder_exist, name),
                             Toast.LENGTH_LONG).show();
                     etName.setSelection(0, etName.length());
@@ -563,7 +676,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
                         values.put(NoteColumns.SNIPPET, name);
                         values.put(NoteColumns.TYPE, Notes.TYPE_FOLDER);
                         values.put(NoteColumns.LOCAL_MODIFIED, 1);
-                        getContentResolver().update(Notes.CONTENT_NOTE_URI, values, NoteColumns.ID
+                        mContentResolver.update(Notes.CONTENT_NOTE_URI, values, NoteColumns.ID
                                 + "=?", new String[] {
                             String.valueOf(mFocusNoteDataItem.getId())
                         });
@@ -572,9 +685,8 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
                     ContentValues values = new ContentValues();
                     values.put(NoteColumns.SNIPPET, name);
                     values.put(NoteColumns.TYPE, Notes.TYPE_FOLDER);
-                    getContentResolver().insert(Notes.CONTENT_NOTE_URI, values);
+                    mContentResolver.insert(Notes.CONTENT_NOTE_URI, values);
                 }
-                viewModel.loadNotes(mCurrentFolderId);
                 dialog.dismiss();
             }
         });
@@ -608,12 +720,31 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
 
     @Override
     public void onBackPressed() {
-        if (viewModel.handleBackPressed()) {
-            mState = ListEditState.NOTE_LIST;
-            mTitleBar.setVisibility(View.GONE);
-            mAddNewNote.setVisibility(View.VISIBLE);
-        } else {
-            super.onBackPressed();
+        if (mIsSearchResult) {
+            mIsSearchResult = false;
+            startAsyncNotesListQuery();
+            return;
+        }
+
+        switch (mState) {
+            case SUB_FOLDER:
+                mCurrentFolderId = Notes.ID_ROOT_FOLDER;
+                mState = ListEditState.NOTE_LIST;
+                startAsyncNotesListQuery();
+                mTitleBar.setVisibility(View.GONE);
+                break;
+            case CALL_RECORD_FOLDER:
+                mCurrentFolderId = Notes.ID_ROOT_FOLDER;
+                mState = ListEditState.NOTE_LIST;
+                mAddNewNote.setVisibility(View.VISIBLE);
+                mTitleBar.setVisibility(View.GONE);
+                startAsyncNotesListQuery();
+                break;
+            case NOTE_LIST:
+                super.onBackPressed();
+                break;
+            default:
+                break;
         }
     }
 
@@ -840,11 +971,21 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     }
 
     private void startQueryDestinationFolders() {
-        viewModel.getFoldersForMove().observe(this, folders -> {
-            if (folders != null && !folders.isEmpty()) {
-                showFolderListMenu(folders);
-            }
-        });
+        String selection = NoteColumns.TYPE + "=? AND " + NoteColumns.PARENT_ID + "<>? AND " + NoteColumns.ID + "<>?";
+        selection = (mState == ListEditState.NOTE_LIST) ? selection:
+            "(" + selection + ") OR (" + NoteColumns.ID + "=" + Notes.ID_ROOT_FOLDER + ")";
+
+        mBackgroundQueryHandler.startQuery(FOLDER_LIST_QUERY_TOKEN,
+                null,
+                Notes.CONTENT_NOTE_URI,
+                FoldersListAdapter.PROJECTION,
+                selection,
+                new String[] {
+                        String.valueOf(Notes.TYPE_FOLDER),
+                        String.valueOf(Notes.ID_TRASH_FOLER),
+                        String.valueOf(mCurrentFolderId)
+                },
+                NoteColumns.MODIFIED_DATE + " DESC");
     }
 
     public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
