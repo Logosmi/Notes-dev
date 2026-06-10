@@ -108,25 +108,15 @@ public class NotesProvider extends ContentProvider {
             String sortOrder) {
         Cursor c = null;
         SQLiteDatabase db = mHelper.getReadableDatabase();
-        String id = null;
-        switch (mMatcher.match(uri)) {
+        int match = mMatcher.match(uri);
+        switch (match) {
             case URI_NOTE:
-                c = db.query(TABLE.NOTE, projection, selection, selectionArgs, null, null,
-                        sortOrder);
-                break;
             case URI_NOTE_ITEM:
-                id = uri.getPathSegments().get(1);
-                c = db.query(TABLE.NOTE, projection, NoteColumns.ID + "=" + id
-                        + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                c = queryTable(db, TABLE.NOTE, NoteColumns.ID, uri, match, projection, selection, selectionArgs, sortOrder);
                 break;
             case URI_DATA:
-                c = db.query(TABLE.DATA, projection, selection, selectionArgs, null, null,
-                        sortOrder);
-                break;
             case URI_DATA_ITEM:
-                id = uri.getPathSegments().get(1);
-                c = db.query(TABLE.DATA, projection, DataColumns.ID + "=" + id
-                        + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                c = queryTable(db, TABLE.DATA, DataColumns.ID, uri, match, projection, selection, selectionArgs, sortOrder);
                 break;
             case URI_SEARCH:
             case URI_SEARCH_SUGGEST:
@@ -136,7 +126,7 @@ public class NotesProvider extends ContentProvider {
                 }
 
                 String searchString = null;
-                if (mMatcher.match(uri) == URI_SEARCH_SUGGEST) {
+                if (match == URI_SEARCH_SUGGEST) {
                     if (uri.getPathSegments().size() > 1) {
                         searchString = uri.getPathSegments().get(1);
                     }
@@ -157,28 +147,19 @@ public class NotesProvider extends ContentProvider {
                 }
                 break;
             case URI_USER:
-                c = db.query(TABLE.USER, projection, selection, selectionArgs, null, null, sortOrder);
-            break;
             case URI_USER_ITEM:
-                id = uri.getPathSegments().get(1);
-                c = db.query(TABLE.USER, projection, "_id=" + id + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                c = queryTable(db, TABLE.USER, "_id", uri, match, projection, selection, selectionArgs, sortOrder);
                 break;
             case URI_TAG:
-                c = db.query(TABLE.TAG, projection, selection, selectionArgs, null, null, sortOrder);
-                break;
             case URI_TAG_ITEM:
-                id = uri.getPathSegments().get(1);
-                c = db.query(TABLE.TAG, projection, "_id=" + id + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                c = queryTable(db, TABLE.TAG, "_id", uri, match, projection, selection, selectionArgs, sortOrder);
                 break;
             case URI_NOTE_TAG:
                 c = db.query(TABLE.NOTE_TAG, projection, selection, selectionArgs, null, null, sortOrder);
                 break;
             case URI_IMAGE:
-                c = db.query(TABLE.IMAGE, projection, selection, selectionArgs, null, null, sortOrder);
-                break;
             case URI_IMAGE_ITEM:
-                id = uri.getPathSegments().get(1);
-                c = db.query(TABLE.IMAGE, projection, "_id=" + id + parseSelection(selection), selectionArgs, null, null, sortOrder);
+                c = queryTable(db, TABLE.IMAGE, "_id", uri, match, projection, selection, selectionArgs, sortOrder);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown URI " + uri);
@@ -189,36 +170,27 @@ public class NotesProvider extends ContentProvider {
         return c;
     }
 
+    private Cursor queryTable(SQLiteDatabase db, String table, String idColumn, Uri uri,
+            int match, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+        boolean isItem = (match % 2 == 0);
+        if (isItem) {
+            String id = uri.getPathSegments().get(1);
+            return db.query(table, projection, idColumn + "=" + id
+                    + parseSelection(selection), selectionArgs, null, null, sortOrder);
+        }
+        return db.query(table, projection, selection, selectionArgs, null, null, sortOrder);
+    }
+
     @Override
     public Uri insert(Uri uri, ContentValues values) {
         SQLiteDatabase db = mHelper.getWritableDatabase();
         long dataId = 0, noteId = 0, insertedId = 0;
         switch (mMatcher.match(uri)) {
             case URI_USER:
-                insertedId = db.insert(TABLE.USER, null, values);
-                if (insertedId > 0) {
-                    getContext().getContentResolver().notifyChange(uri, null);
-                }
-                return ContentUris.withAppendedId(uri, insertedId);
             case URI_TAG:
-                insertedId = db.insert(TABLE.TAG, null, values);
-                if (insertedId > 0) {
-                    getContext().getContentResolver().notifyChange(uri, null);
-                }
-                return ContentUris.withAppendedId(uri, insertedId);
             case URI_NOTE_TAG:
-                insertedId = db.insert(TABLE.NOTE_TAG, null, values);
-                if (insertedId > 0) {
-                    getContext().getContentResolver().notifyChange(uri, null);
-                }
-                return ContentUris.withAppendedId(uri, insertedId);
             case URI_IMAGE:
-                insertedId = db.insert(TABLE.IMAGE, null, values);
-                if (insertedId > 0) {
-                    getContext().getContentResolver().notifyChange(uri, null);
-                }
-                return ContentUris.withAppendedId(uri, insertedId);
-
+                return insertAndNotify(db, uri, values);
             case URI_NOTE:
                 insertedId = noteId = db.insert(TABLE.NOTE, null, values);
                 break;
@@ -248,62 +220,63 @@ public class NotesProvider extends ContentProvider {
         return ContentUris.withAppendedId(uri, insertedId);
     }
 
+    private Uri insertAndNotify(SQLiteDatabase db, Uri uri, ContentValues values) {
+        long id = db.insert(getTableName(mMatcher.match(uri)), null, values);
+        if (id > 0) {
+            getContext().getContentResolver().notifyChange(uri, null);
+        }
+        return ContentUris.withAppendedId(uri, id);
+    }
+
+    private String getTableName(int match) {
+        switch (match) {
+            case URI_NOTE: case URI_NOTE_ITEM: return TABLE.NOTE;
+            case URI_DATA: case URI_DATA_ITEM: return TABLE.DATA;
+            case URI_USER: case URI_USER_ITEM: return TABLE.USER;
+            case URI_TAG: case URI_TAG_ITEM: return TABLE.TAG;
+            case URI_NOTE_TAG: return TABLE.NOTE_TAG;
+            case URI_IMAGE: case URI_IMAGE_ITEM: return TABLE.IMAGE;
+            default: throw new IllegalArgumentException("Unknown URI match: " + match);
+        }
+    }
+
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         int count = 0;
-        String id = null;
         SQLiteDatabase db = mHelper.getWritableDatabase();
         boolean deleteData = false;
-        switch (mMatcher.match(uri)) {
-            case URI_USER:
-                count = db.delete(TABLE.USER, selection, selectionArgs);
+        int match = mMatcher.match(uri);
+        switch (match) {
+            case URI_USER: case URI_USER_ITEM:
+                count = deleteTable(db, TABLE.USER, "_id", uri, match, selection, selectionArgs);
                 break;
-            case URI_USER_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.delete(TABLE.USER, "_id=" + id + parseSelection(selection), selectionArgs);
-                break;
-            case URI_TAG:
-                count = db.delete(TABLE.TAG, selection, selectionArgs);
-                break;
-            case URI_TAG_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.delete(TABLE.TAG, "_id=" + id + parseSelection(selection), selectionArgs);
+            case URI_TAG: case URI_TAG_ITEM:
+                count = deleteTable(db, TABLE.TAG, "_id", uri, match, selection, selectionArgs);
                 break;
             case URI_NOTE_TAG:
                 count = db.delete(TABLE.NOTE_TAG, selection, selectionArgs);
                 break;
-            case URI_IMAGE:
-                count = db.delete(TABLE.IMAGE, selection, selectionArgs);
-                break;
-            case URI_IMAGE_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.delete(TABLE.IMAGE, "_id=" + id + parseSelection(selection), selectionArgs);
+            case URI_IMAGE: case URI_IMAGE_ITEM:
+                count = deleteTable(db, TABLE.IMAGE, "_id", uri, match, selection, selectionArgs);
                 break;
             case URI_NOTE:
                 selection = "(" + selection + ") AND " + NoteColumns.ID + ">0 ";
                 count = db.delete(TABLE.NOTE, selection, selectionArgs);
                 break;
-            case URI_NOTE_ITEM:
-                id = uri.getPathSegments().get(1);
-                /**
-                 * ID that smaller than 0 is system folder which is not allowed to
-                 * trash
-                 */
+            case URI_NOTE_ITEM: {
+                String id = uri.getPathSegments().get(1);
                 long noteId = Long.valueOf(id);
-                if (noteId <= 0) {
-                    break;
-                }
+                if (noteId <= 0) break;
                 count = db.delete(TABLE.NOTE,
                         NoteColumns.ID + "=" + id + parseSelection(selection), selectionArgs);
                 break;
+            }
             case URI_DATA:
                 count = db.delete(TABLE.DATA, selection, selectionArgs);
                 deleteData = true;
                 break;
             case URI_DATA_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.delete(TABLE.DATA,
-                        DataColumns.ID + "=" + id + parseSelection(selection), selectionArgs);
+                count = deleteTable(db, TABLE.DATA, DataColumns.ID, uri, match, selection, selectionArgs);
                 deleteData = true;
                 break;
             default:
@@ -318,55 +291,48 @@ public class NotesProvider extends ContentProvider {
         return count;
     }
 
+    private int deleteTable(SQLiteDatabase db, String table, String idColumn, Uri uri,
+            int match, String selection, String[] selectionArgs) {
+        if (isItemUri(match)) {
+            String id = uri.getPathSegments().get(1);
+            return db.delete(table, idColumn + "=" + id + parseSelection(selection), selectionArgs);
+        }
+        return db.delete(table, selection, selectionArgs);
+    }
+
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
         int count = 0;
-        String id = null;
         SQLiteDatabase db = mHelper.getWritableDatabase();
         boolean updateData = false;
-        switch (mMatcher.match(uri)) {
-            case URI_USER:
-                count = db.update(TABLE.USER, values, selection, selectionArgs);
+        int match = mMatcher.match(uri);
+        switch (match) {
+            case URI_USER: case URI_USER_ITEM:
+                count = updateTable(db, TABLE.USER, "_id", uri, match, values, selection, selectionArgs);
                 break;
-            case URI_USER_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.update(TABLE.USER, values, "_id=" + id + parseSelection(selection), selectionArgs);
-                break;
-            case URI_TAG:
-                count = db.update(TABLE.TAG, values, selection, selectionArgs);
-                break;
-            case URI_TAG_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.update(TABLE.TAG, values, "_id=" + id + parseSelection(selection), selectionArgs);
+            case URI_TAG: case URI_TAG_ITEM:
+                count = updateTable(db, TABLE.TAG, "_id", uri, match, values, selection, selectionArgs);
                 break;
             case URI_NOTE_TAG:
                 count = db.update(TABLE.NOTE_TAG, values, selection, selectionArgs);
                 break;
-            case URI_IMAGE:
-                count = db.update(TABLE.IMAGE, values, selection, selectionArgs);
-                break;
-            case URI_IMAGE_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.update(TABLE.IMAGE, values, "_id=" + id + parseSelection(selection), selectionArgs);
+            case URI_IMAGE: case URI_IMAGE_ITEM:
+                count = updateTable(db, TABLE.IMAGE, "_id", uri, match, values, selection, selectionArgs);
                 break;
             case URI_NOTE:
                 increaseNoteVersion(-1, selection, selectionArgs);
                 count = db.update(TABLE.NOTE, values, selection, selectionArgs);
                 break;
             case URI_NOTE_ITEM:
-                id = uri.getPathSegments().get(1);
-                increaseNoteVersion(Long.valueOf(id), selection, selectionArgs);
-                count = db.update(TABLE.NOTE, values, NoteColumns.ID + "=" + id
-                        + parseSelection(selection), selectionArgs);
+                increaseNoteVersion(Long.valueOf(uri.getPathSegments().get(1)), selection, selectionArgs);
+                count = updateTable(db, TABLE.NOTE, NoteColumns.ID, uri, match, values, selection, selectionArgs);
                 break;
             case URI_DATA:
                 count = db.update(TABLE.DATA, values, selection, selectionArgs);
                 updateData = true;
                 break;
             case URI_DATA_ITEM:
-                id = uri.getPathSegments().get(1);
-                count = db.update(TABLE.DATA, values, DataColumns.ID + "=" + id
-                        + parseSelection(selection), selectionArgs);
+                count = updateTable(db, TABLE.DATA, DataColumns.ID, uri, match, values, selection, selectionArgs);
                 updateData = true;
                 break;
             default:
@@ -382,33 +348,52 @@ public class NotesProvider extends ContentProvider {
         return count;
     }
 
+    private int updateTable(SQLiteDatabase db, String table, String idColumn, Uri uri,
+            int match, ContentValues values, String selection, String[] selectionArgs) {
+        if (isItemUri(match)) {
+            String id = uri.getPathSegments().get(1);
+            return db.update(table, values, idColumn + "=" + id + parseSelection(selection), selectionArgs);
+        }
+        return db.update(table, values, selection, selectionArgs);
+    }
+
+    private boolean isItemUri(int match) {
+        return match % 2 == 0;
+    }
+
     private String parseSelection(String selection) {
         return (!TextUtils.isEmpty(selection) ? " AND (" + selection + ')' : "");
     }
 
     private void increaseNoteVersion(long id, String selection, String[] selectionArgs) {
-        StringBuilder sql = new StringBuilder(120);
-        sql.append("UPDATE ");
-        sql.append(TABLE.NOTE);
-        sql.append(" SET ");
-        sql.append(NoteColumns.VERSION);
-        sql.append("=" + NoteColumns.VERSION + "+1 ");
+        SQLiteDatabase db = mHelper.getWritableDatabase();
+        StringBuilder whereClause = new StringBuilder();
+        String[] whereArgs = null;
 
-        if (id > 0 || !TextUtils.isEmpty(selection)) {
-            sql.append(" WHERE ");
-        }
         if (id > 0) {
-            sql.append(NoteColumns.ID + "=" + String.valueOf(id));
+            whereClause.append(NoteColumns.ID).append("=").append(id);
         }
         if (!TextUtils.isEmpty(selection)) {
-            String selectString = id > 0 ? parseSelection(selection) : selection;
-            for (String args : selectionArgs) {
-                selectString = selectString.replaceFirst("\\?", args);
+            if (whereClause.length() > 0) {
+                whereClause.append(" AND (").append(selection).append(")");
+            } else {
+                whereClause.append(selection);
             }
-            sql.append(selectString);
+            whereArgs = selectionArgs;
         }
 
-        mHelper.getWritableDatabase().execSQL(sql.toString());
+        if (whereClause.length() > 0) {
+            if (whereArgs != null && whereArgs.length > 0) {
+                db.execSQL("UPDATE " + TABLE.NOTE + " SET " + NoteColumns.VERSION
+                        + "=" + NoteColumns.VERSION + "+1 WHERE " + whereClause.toString(), whereArgs);
+            } else {
+                db.execSQL("UPDATE " + TABLE.NOTE + " SET "
+                        + NoteColumns.VERSION + "=" + NoteColumns.VERSION + "+1 WHERE " + whereClause.toString());
+            }
+        } else {
+            db.execSQL("UPDATE " + TABLE.NOTE + " SET "
+                    + NoteColumns.VERSION + "=" + NoteColumns.VERSION + "+1");
+        }
     }
 
     @Override

@@ -47,6 +47,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
+import java.lang.ref.WeakReference;
+
 
 public class GTaskManager {
     private static final String TAG = GTaskManager.class.getSimpleName();
@@ -63,7 +65,7 @@ public class GTaskManager {
 
     private static GTaskManager mInstance = null;
 
-    private Activity mActivity;
+    private WeakReference<Activity> mActivityRef;
 
     private Context mContext;
 
@@ -108,7 +110,7 @@ public class GTaskManager {
 
     public synchronized void setActivityContext(Activity activity) {
         // used for getting authtoken
-        mActivity = activity;
+        mActivityRef = new WeakReference<>(activity);
     }
 
     public int sync(Context context, GTaskASyncTask asyncTask) {
@@ -133,7 +135,7 @@ public class GTaskManager {
 
             // login google task
             if (!mCancelled) {
-                if (!client.login(mActivity)) {
+                if (!client.login(mActivityRef.get())) {
                     throw new NetworkFailureException("login google task failed");
                 }
             }

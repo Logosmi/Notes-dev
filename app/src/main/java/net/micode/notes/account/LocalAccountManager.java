@@ -1,5 +1,6 @@
 package net.micode.notes.account;
 
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -8,7 +9,7 @@ import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
 
-import net.micode.notes.data.NotesProvider;
+import net.micode.notes.data.Notes;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -62,8 +63,7 @@ public class LocalAccountManager {
         values.put("failCount", 0);
         values.put("createdTime", System.currentTimeMillis());
 
-        Uri uri = Uri.parse("content://micode_notes/user");
-        Uri result = mContext.getContentResolver().insert(uri, values);
+        Uri result = mContext.getContentResolver().insert(Notes.CONTENT_USER_URI, values);
         if (result != null) {
             return REGISTER_SUCCESS;
         }
@@ -73,8 +73,7 @@ public class LocalAccountManager {
     public int login(String username, String password) {
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user");
-            c = mContext.getContentResolver().query(uri, null,
+            c = mContext.getContentResolver().query(Notes.CONTENT_USER_URI, null,
                     "username=?", new String[]{username}, null);
             if (c == null || !c.moveToFirst()) {
                 return LOGIN_USER_NOT_FOUND;
@@ -99,7 +98,7 @@ public class LocalAccountManager {
     public String requestSecurityQuestion(String username) {
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user");
+            Uri uri = Notes.CONTENT_USER_URI;
             c = mContext.getContentResolver().query(uri, null,
                     "username=?", new String[]{username}, null);
             if (c != null && c.moveToFirst()) {
@@ -114,7 +113,7 @@ public class LocalAccountManager {
     public boolean verifyAnswer(String username, String answer) {
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user");
+            Uri uri = Notes.CONTENT_USER_URI;
             c = mContext.getContentResolver().query(uri, null,
                     "username=?", new String[]{username}, null);
             if (c != null && c.moveToFirst()) {
@@ -150,8 +149,7 @@ public class LocalAccountManager {
         }
         ContentValues values = new ContentValues();
         values.put("passwordHash", sha256(newPassword));
-        Uri uri = Uri.parse("content://micode_notes/user");
-        int rows = mContext.getContentResolver().update(uri, values,
+        int rows = mContext.getContentResolver().update(Notes.CONTENT_USER_URI, values,
                 "username=?", new String[]{username});
         if (rows > 0) {
             return RESET_SUCCESS;
@@ -178,7 +176,7 @@ public class LocalAccountManager {
     private boolean isUsernameExists(String username) {
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user");
+            Uri uri = Notes.CONTENT_USER_URI;
             c = mContext.getContentResolver().query(uri, null,
                     "username=?", new String[]{username}, null);
             return c != null && c.getCount() > 0;
@@ -208,7 +206,7 @@ public class LocalAccountManager {
     private void incrementFailCount(long userId) {
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user/" + userId);
+            Uri uri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
             c = mContext.getContentResolver().query(uri, new String[]{"failCount"}, null, null, null);
             if (c != null && c.moveToFirst()) {
                 int current = c.getInt(0);
@@ -222,7 +220,7 @@ public class LocalAccountManager {
     }
 
     private void resetFailCount(long userId) {
-        Uri uri = Uri.parse("content://micode_notes/user/" + userId);
+        Uri uri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
         ContentValues values = new ContentValues();
         values.put("failCount", 0);
         mContext.getContentResolver().update(uri, values, null, null);
@@ -231,7 +229,7 @@ public class LocalAccountManager {
     public boolean isAnyUserRegistered() {
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user");
+            Uri uri = Notes.CONTENT_USER_URI;
             c = mContext.getContentResolver().query(uri, null, null, null, null);
             return c != null && c.getCount() > 0;
         } finally {
@@ -244,7 +242,7 @@ public class LocalAccountManager {
         long userId = getCurrentUserId();
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user/" + userId);
+            Uri uri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
             c = mContext.getContentResolver().query(uri, new String[]{"passwordHash"}, null, null, null);
             if (c != null && c.moveToFirst()) {
                 String storedHash = c.getString(0);
@@ -261,7 +259,7 @@ public class LocalAccountManager {
         ContentValues values = new ContentValues();
         values.put("securityQuestion", newQuestion);
         values.put("securityAnswerHash", sha256(newAnswer));
-        Uri uri = Uri.parse("content://micode_notes/user/" + userId);
+        Uri uri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
         int rows = mContext.getContentResolver().update(uri, values, null, null);
         return rows > 0;
     }
@@ -271,7 +269,7 @@ public class LocalAccountManager {
         long userId = getCurrentUserId();
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user/" + userId);
+            Uri uri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
             c = mContext.getContentResolver().query(uri, new String[]{"passwordHash"}, null, null, null);
             if (c != null && c.moveToFirst()) {
                 String storedHash = c.getString(0);
@@ -286,7 +284,7 @@ public class LocalAccountManager {
         }
         ContentValues values = new ContentValues();
         values.put("passwordHash", sha256(newPassword));
-        Uri uri = Uri.parse("content://micode_notes/user/" + userId);
+        Uri uri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
         int rows = mContext.getContentResolver().update(uri, values, null, null);
         return rows > 0;
     }
@@ -296,7 +294,7 @@ public class LocalAccountManager {
         long userId = getCurrentUserId();
         Cursor c = null;
         try {
-            Uri uri = Uri.parse("content://micode_notes/user/" + userId);
+            Uri uri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
             c = mContext.getContentResolver().query(uri, new String[]{"passwordHash"}, null, null, null);
             if (c != null && c.moveToFirst()) {
                 String storedHash = c.getString(0);
@@ -311,13 +309,13 @@ public class LocalAccountManager {
         }
 
         if (deleteNotes) {
-            Uri dataUri = Uri.parse("content://micode_notes/data");
+            Uri dataUri = Notes.CONTENT_DATA_URI;
             mContext.getContentResolver().delete(dataUri, null, null);
-            Uri noteUri = Uri.parse("content://micode_notes/note");
+            Uri noteUri = Notes.CONTENT_NOTE_URI;
             mContext.getContentResolver().delete(noteUri, "_id > 0", null);
         }
 
-        Uri userUri = Uri.parse("content://micode_notes/user/" + userId);
+        Uri userUri = ContentUris.withAppendedId(Notes.CONTENT_USER_URI, userId);
         int rows = mContext.getContentResolver().delete(userUri, null, null);
         return rows > 0;
     }

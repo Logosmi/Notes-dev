@@ -27,9 +27,9 @@ import android.os.RemoteException;
 import android.util.Log;
 
 import net.micode.notes.data.Notes;
+import net.micode.notes.data.Notes.AppWidgetAttribute;
 import net.micode.notes.data.Notes.CallNote;
 import net.micode.notes.data.Notes.NoteColumns;
-import net.micode.notes.ui.NotesListAdapter.AppWidgetAttribute;
 
 import java.util.ArrayList;
 import java.util.HashSet;

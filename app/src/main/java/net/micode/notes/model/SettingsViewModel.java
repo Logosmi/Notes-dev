@@ -1,8 +1,6 @@
-package net.micode.notes.ui;
+package net.micode.notes.model;
 
 import android.app.Application;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.format.DateFormat;
 
 import androidx.lifecycle.AndroidViewModel;
@@ -11,13 +9,13 @@ import androidx.lifecycle.MutableLiveData;
 
 import net.micode.notes.R;
 import net.micode.notes.gtask.remote.GTaskSyncService;
+import net.micode.notes.ui.NotesPreferenceActivity;
 
 public class SettingsViewModel extends AndroidViewModel {
     private final MutableLiveData<String> syncButtonText = new MutableLiveData<>();
     private final MutableLiveData<Boolean> syncButtonEnabled = new MutableLiveData<>(false);
     private final MutableLiveData<String> syncStatusText = new MutableLiveData<>();
     private final MutableLiveData<Boolean> syncStatusVisible = new MutableLiveData<>(false);
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public SettingsViewModel(Application application) {
         super(application);
@@ -30,33 +28,31 @@ public class SettingsViewModel extends AndroidViewModel {
     public LiveData<Boolean> getSyncStatusVisible() { return syncStatusVisible; }
 
     public void refreshSyncUI() {
-        mainHandler.post(() -> {
-            Application app = getApplication();
-            boolean isSyncing = GTaskSyncService.isSyncing();
-            String account = NotesPreferenceActivity.getSyncAccountName(app);
+        Application app = getApplication();
+        boolean isSyncing = GTaskSyncService.isSyncing();
+        String account = NotesPreferenceActivity.getSyncAccountName(app);
 
-            syncButtonText.setValue(isSyncing ?
-                    app.getString(R.string.preferences_button_sync_cancel) :
-                    app.getString(R.string.preferences_button_sync_immediately));
+        syncButtonText.setValue(isSyncing ?
+                app.getString(R.string.preferences_button_sync_cancel) :
+                app.getString(R.string.preferences_button_sync_immediately));
 
-            syncButtonEnabled.setValue(!account.isEmpty());
+        syncButtonEnabled.setValue(!account.isEmpty());
 
-            if (isSyncing) {
-                syncStatusText.setValue(GTaskSyncService.getProgressString());
+        if (isSyncing) {
+            syncStatusText.setValue(GTaskSyncService.getProgressString());
+            syncStatusVisible.setValue(true);
+        } else {
+            long lastSyncTime = NotesPreferenceActivity.getLastSyncTime(app);
+            if (lastSyncTime != 0) {
+                String timeStr = DateFormat.format(
+                        app.getString(R.string.preferences_last_sync_time_format),
+                        lastSyncTime).toString();
+                syncStatusText.setValue(app.getString(R.string.preferences_last_sync_time, timeStr));
                 syncStatusVisible.setValue(true);
             } else {
-                long lastSyncTime = NotesPreferenceActivity.getLastSyncTime(app);
-                if (lastSyncTime != 0) {
-                    String timeStr = DateFormat.format(
-                            app.getString(R.string.preferences_last_sync_time_format),
-                            lastSyncTime).toString();
-                    syncStatusText.setValue(app.getString(R.string.preferences_last_sync_time, timeStr));
-                    syncStatusVisible.setValue(true);
-                } else {
-                    syncStatusText.setValue("");
-                    syncStatusVisible.setValue(false);
-                }
+                syncStatusText.setValue("");
+                syncStatusVisible.setValue(false);
             }
-        });
+        }
     }
 }

@@ -11,20 +11,19 @@ import androidx.lifecycle.MutableLiveData;
 
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.tool.DataUtils;
-import net.micode.notes.ui.NoteItemData;
 import net.micode.notes.R;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class NoteRepository {
 
     private final ContentResolver contentResolver;
     private final Context context;
-    private final Executor executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     public NoteRepository(ContentResolver resolver, Context ctx) {
         this.contentResolver = resolver;
@@ -175,6 +174,10 @@ public class NoteRepository {
 
     public int getUserFolderCount() {
         return DataUtils.getUserFolderCount(contentResolver);
+    }
+
+    public void shutdown() {
+        executor.shutdown();
     }
 
     public static class FolderItem {

@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-package net.micode.notes.ui;
+package net.micode.notes.data;
 
 import android.content.Context;
 import android.database.Cursor;
 import android.text.TextUtils;
 
-import net.micode.notes.data.Contact;
-import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.tool.DataUtils;
 
@@ -86,8 +84,8 @@ public class NoteItemData {
         mNotesCount = cursor.getInt(NOTES_COUNT_COLUMN);
         mParentId = cursor.getLong(PARENT_ID_COLUMN);
         mSnippet = cursor.getString(SNIPPET_COLUMN);
-        mSnippet = mSnippet.replace(NoteEditActivity.TAG_CHECKED, "").replace(
-                NoteEditActivity.TAG_UNCHECKED, "");
+        mSnippet = mSnippet.replace(Notes.TAG_CHECKED, "").replace(
+                Notes.TAG_UNCHECKED, "");
         mType = cursor.getInt(TYPE_COLUMN);
         mWidgetId = cursor.getInt(WIDGET_ID_COLUMN);
         mWidgetType = cursor.getInt(WIDGET_TYPE_COLUMN);

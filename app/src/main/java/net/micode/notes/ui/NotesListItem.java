@@ -25,6 +25,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import net.micode.notes.R;
+import net.micode.notes.data.NoteItemData;
 import net.micode.notes.data.Notes;
 import net.micode.notes.tool.DataUtils;
 import net.micode.notes.tool.ResourceParser.NoteItemBgResources;

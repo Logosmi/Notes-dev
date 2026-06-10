@@ -147,8 +147,8 @@ public class NoteEditActivity extends Activity implements OnClickListener,
 
     private static final int SHORTCUT_ICON_TITLE_MAX_LEN = 10;
 
-    public static final String TAG_CHECKED = String.valueOf('\u221A');
-    public static final String TAG_UNCHECKED = String.valueOf('\u25A1');
+    public static final String TAG_CHECKED = Notes.TAG_CHECKED;
+    public static final String TAG_UNCHECKED = Notes.TAG_UNCHECKED;
 
     private LinearLayout mEditTextList;
 

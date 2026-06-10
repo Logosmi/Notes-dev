@@ -34,6 +34,7 @@ import net.micode.notes.account.LocalAccountManager;
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.gtask.remote.GTaskSyncService;
+import net.micode.notes.model.SettingsViewModel;
 
 import java.io.File;
 import java.io.FileOutputStream;

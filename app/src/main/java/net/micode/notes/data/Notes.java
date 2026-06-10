@@ -46,9 +46,17 @@ public class Notes {
     public static final int TYPE_WIDGET_2X            = 0;
     public static final int TYPE_WIDGET_4X            = 1;
 
+    public static final String TAG_CHECKED = String.valueOf('\u221A');
+    public static final String TAG_UNCHECKED = String.valueOf('\u25A1');
+
     public static class DataConstants {
         public static final String NOTE = TextNote.CONTENT_ITEM_TYPE;
         public static final String CALL_NOTE = CallNote.CONTENT_ITEM_TYPE;
+    }
+
+    public static class AppWidgetAttribute {
+        public int widgetId;
+        public int widgetType;
     }
 
     /**
@@ -60,6 +68,10 @@ public class Notes {
      * Uri to query data
      */
     public static final Uri CONTENT_DATA_URI = Uri.parse("content://" + AUTHORITY + "/data");
+
+    public static final Uri CONTENT_USER_URI = Uri.parse("content://" + AUTHORITY + "/user");
+    public static final Uri CONTENT_TAG_URI = Uri.parse("content://" + AUTHORITY + "/tag");
+    public static final Uri CONTENT_IMAGE_URI = Uri.parse("content://" + AUTHORITY + "/image");
 
     public interface NoteColumns {
         /**
