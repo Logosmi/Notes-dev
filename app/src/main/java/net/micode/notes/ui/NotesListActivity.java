@@ -27,6 +27,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -42,12 +43,14 @@ import net.micode.notes.R;
 import net.micode.notes.data.NoteItemData;
 import net.micode.notes.data.NoteRepository;
 import net.micode.notes.data.Notes;
+import net.micode.notes.data.Notes.AppWidgetAttribute;
 import net.micode.notes.model.NotesListViewModel;
 import net.micode.notes.model.NotesListViewModel.ExportResult;
 import net.micode.notes.model.NotesListViewModel.ListEditState;
+import net.micode.notes.tag.Tag;
+import net.micode.notes.tag.TagManager;
 import net.micode.notes.tool.BackupUtils;
 import net.micode.notes.tool.DataUtils;
-import net.micode.notes.data.Notes.AppWidgetAttribute;
 import net.micode.notes.widget.NoteWidgetProvider_2x;
 import net.micode.notes.widget.NoteWidgetProvider_4x;
 
@@ -64,6 +67,8 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     private ListView mNotesListView;
     private View mAddNewNote;
     private TextView mTitleBar;
+    private View mTagFilterContainer;
+    private LinearLayout mTagFilterBar;
     private NotesListViewModel viewModel;
     private MaterialToolbar mToolbar;
     private CharSequence mOriginalTitle;
@@ -111,6 +116,7 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
     protected void onResume() {
         super.onResume();
         loadBackground();
+        refreshTagFilter();
         Boolean searchMode = viewModel.isSearchMode().getValue();
         if (searchMode == null || !searchMode) {
             Long currentFolderId = viewModel.getCurrentFolderId().getValue();
@@ -141,6 +147,8 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         mAddNewNote = findViewById(R.id.btn_new_note);
         mAddNewNote.setOnClickListener(this);
         mTitleBar = findViewById(R.id.tv_title_bar);
+        mTagFilterContainer = findViewById(R.id.tag_filter_container);
+        mTagFilterBar = findViewById(R.id.tag_filter_bar);
     }
 
     private void loadBackground() {
@@ -267,6 +275,36 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
         viewModel.openFolder(data.getId(), data.getSnippet());
     }
 
+    // ── 标签过滤 ──
+
+    private void refreshTagFilter() {
+        TagManager tm = TagManager.getInstance(this);
+        List<Tag> tags = tm.getAllTags();
+        mTagFilterBar.removeAllViews();
+        if (tags.isEmpty()) {
+            mTagFilterContainer.setVisibility(View.GONE);
+            return;
+        }
+        mTagFilterContainer.setVisibility(View.VISIBLE);
+        for (Tag tag : tags) {
+            Button chip = new Button(this);
+            chip.setText("#" + tag.getName());
+            chip.setTextSize(12);
+            chip.setPadding(16, 4, 16, 4);
+            chip.setOnClickListener(v -> {
+                List<Long> noteIds = tm.getNoteIdsByTagId(tag.getId());
+                viewModel.filterByNoteIds(noteIds);
+            });
+            mTagFilterBar.addView(chip);
+        }
+        Button allBtn = new Button(this);
+        allBtn.setText(R.string.tag_filter_all);
+        allBtn.setTextSize(12);
+        allBtn.setPadding(16, 4, 16, 4);
+        allBtn.setOnClickListener(v -> viewModel.loadNotes(viewModel.getCurrentFolderIdValue()));
+        mTagFilterBar.addView(allBtn);
+    }
+
     // ── 选项菜单 ──
 
     @Override
@@ -295,6 +333,8 @@ public class NotesListActivity extends AppCompatActivity implements OnClickListe
             startPreferenceActivity();
         } else if (itemId == R.id.menu_search) {
             onSearchRequested();
+        } else if (itemId == R.id.menu_manage_tags) {
+            startActivity(new Intent(this, TagManagementActivity.class));
         } else {
             return super.onOptionsItemSelected(item);
         }

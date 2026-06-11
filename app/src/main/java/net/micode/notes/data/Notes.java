@@ -71,6 +71,7 @@ public class Notes {
 
     public static final Uri CONTENT_USER_URI = Uri.parse("content://" + AUTHORITY + "/user");
     public static final Uri CONTENT_TAG_URI = Uri.parse("content://" + AUTHORITY + "/tag");
+    public static final Uri CONTENT_NOTE_TAG_URI = Uri.parse("content://" + AUTHORITY + "/note_tag");
     public static final Uri CONTENT_IMAGE_URI = Uri.parse("content://" + AUTHORITY + "/image");
 
     public interface NoteColumns {

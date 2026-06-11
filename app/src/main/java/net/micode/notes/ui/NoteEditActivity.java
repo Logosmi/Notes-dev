@@ -22,11 +22,14 @@ import android.appwidget.AppWidgetManager;
 import android.content.Intent;
 import android.graphics.Paint;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.text.format.DateUtils;
 import android.text.style.BackgroundColorSpan;
+import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -122,6 +125,9 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
     private String mUserQuery;
     private Pattern mPattern;
     private TextView mMenuMore;
+
+    private static final Pattern LABEL_PATTERN = Pattern.compile("#(\\S+)");
+    private int mLabelColor;
 
     private NoteEditViewModel viewModel;
 
@@ -232,6 +238,14 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         mFontSizeSelector = findViewById(R.id.font_size_selector);
         for (int id : sFontSizeBtnsMap.keySet()) findViewById(id).setOnClickListener(this);
         mEditTextList = findViewById(R.id.note_edit_list);
+        mLabelColor = getResources().getColor(R.color.tag_highlight, getTheme());
+
+        // live label highlighting
+        mNoteEditor.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) { applyLabelHighlighting(s); }
+        });
     }
 
     @Override
@@ -462,6 +476,21 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
                 ? content.substring(0, SHORTCUT_ICON_TITLE_MAX_LEN) : content;
     }
 
+    // ── Label Highlighting ──
+
+    private void applyLabelHighlighting(Editable text) {
+        if (text == null) return;
+        // clear existing ForegroundColorSpans
+        for (ForegroundColorSpan span : text.getSpans(0, text.length(), ForegroundColorSpan.class)) {
+            text.removeSpan(span);
+        }
+        Matcher m = LABEL_PATTERN.matcher(text);
+        while (m.find()) {
+            text.setSpan(new ForegroundColorSpan(mLabelColor), m.start(), m.end(),
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+    }
+
     // ── Widget ──
 
     private void updateWidget() {
@@ -512,6 +541,11 @@ public class NoteEditActivity extends AppCompatActivity implements OnClickListen
         edit.setOnTextViewChangeListener(this);
         edit.setIndex(index);
         edit.setText(getHighlightQueryResult(item, mUserQuery));
+        edit.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) { applyLabelHighlighting(s); }
+        });
         return v;
     }
 

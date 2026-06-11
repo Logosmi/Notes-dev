@@ -129,6 +129,18 @@
     <string name="search">Notes</string>
     <string name="datetime_dialog_ok">set</string>
     <string name="datetime_dialog_cancel">cancel</string>
+
+    <!-- Tag strings -->
+    <string name="tag_name_hint">Tag name</string>
+    <string name="tag_create">Create</string>
+    <string name="tag_delete_confirm">Delete tag \"%s\"?</string>
+    <string name="tag_delete">Delete Tag</string>
+    <string name="tag_empty">No tags yet</string>
+    <string name="tag_select_title">Select Tags</string>
+    <string name="tag_manage">Manage Tags</string>
+    <string name="tag_filter_all">All</string>
+    <string name="tag_add">Add Tag</string>
+
     <plurals name="search_results_title">
          <item quantity="one"><xliff:g id="number" example="1">%1$s</xliff:g> result for \"<xliff:g id="search" example="???">%2$s</xliff:g>\"</item>
         <!-- Case of 0 or 2 or more results. -->

@@ -20,6 +20,7 @@ import androidx.lifecycle.MutableLiveData;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.TextNote;
+import net.micode.notes.tag.TagManager;
 import net.micode.notes.tool.DataUtils;
 import net.micode.notes.tool.ResourceParser;
 import net.micode.notes.tool.ResourceParser.TextAppearanceResources;
@@ -161,6 +162,12 @@ public class NoteEditViewModel extends AndroidViewModel implements WorkingNote.N
         if (saved) {
             updateStateFromNote();
             noteSaved.setValue(true);
+            // sync inline #tags
+            String content = mWorkingNote.getContent();
+            long noteId = mWorkingNote.getNoteId();
+            if (content != null && noteId > 0) {
+                TagManager.getInstance(getApplication()).syncTagsForNote(noteId, content);
+            }
         }
         return saved;
     }

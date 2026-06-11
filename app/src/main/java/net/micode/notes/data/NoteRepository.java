@@ -92,6 +92,36 @@ public class NoteRepository {
         return liveData;
     }
 
+    public LiveData<List<NoteItemData>> getNotesByIds(List<Long> noteIds) {
+        MutableLiveData<List<NoteItemData>> liveData = new MutableLiveData<>();
+        if (noteIds == null || noteIds.isEmpty()) {
+            liveData.postValue(new ArrayList<>());
+            return liveData;
+        }
+        executor.execute(() -> {
+            StringBuilder sb = new StringBuilder();
+            String[] args = new String[noteIds.size()];
+            for (int i = 0; i < noteIds.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append("?");
+                args[i] = String.valueOf(noteIds.get(i));
+            }
+            String selection = NoteColumns.ID + " IN (" + sb.toString() + ") AND "
+                    + NoteColumns.TYPE + "=" + Notes.TYPE_NOTE;
+            Cursor cursor = contentResolver.query(
+                    Notes.CONTENT_NOTE_URI, NoteItemData.PROJECTION,
+                    selection, args,
+                    NoteColumns.MODIFIED_DATE + " DESC");
+            List<NoteItemData> list = new ArrayList<>();
+            if (cursor != null) {
+                while (cursor.moveToNext()) list.add(new NoteItemData(context, cursor));
+                cursor.close();
+            }
+            liveData.postValue(list);
+        });
+        return liveData;
+    }
+
     public LiveData<List<FolderItem>> getFoldersForMove(long currentFolderId) {
         MutableLiveData<List<FolderItem>> liveData = new MutableLiveData<>();
         executor.execute(() -> {

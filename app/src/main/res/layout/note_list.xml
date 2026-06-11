@@ -36,6 +36,21 @@
             android:textColor="#FFEAD1AE"
             android:textSize="@dimen/text_font_size_medium" />
 
+        <HorizontalScrollView
+            android:id="@+id/tag_filter_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:scrollbars="none"
+            android:padding="4dp">
+
+            <LinearLayout
+                android:id="@+id/tag_filter_bar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
         <ListView
             android:id="@+id/notes_list"
             android:layout_width="fill_parent"

@@ -26,4 +26,9 @@
         android:title="@string/menu_search"
         app:showAsAction="ifRoom" />
 
+    <item
+        android:id="@+id/menu_manage_tags"
+        android:title="@string/tag_manage"
+        app:showAsAction="never" />
+
 </menu>

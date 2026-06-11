@@ -5,6 +5,7 @@
     <color name="primary_container">#FFDBCA</color>
     <color name="on_primary_container">#391000</color>
     <color name="user_query_highlight">#FFFF00</color>
+    <color name="tag_highlight">#1976D2</color>
 
     <color name="secondary">#FFB74D</color>
     <color name="on_secondary">#000000</color>

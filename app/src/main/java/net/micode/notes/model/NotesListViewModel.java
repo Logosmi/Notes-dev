@@ -19,6 +19,8 @@ import net.micode.notes.R;
 import net.micode.notes.data.NoteItemData;
 import net.micode.notes.data.NoteRepository;
 import net.micode.notes.data.Notes;
+import net.micode.notes.tag.Tag;
+import net.micode.notes.tag.TagManager;
 import net.micode.notes.tool.ExportTextWorker;
 import net.micode.notes.tool.ResourceParser;
 
@@ -96,6 +98,16 @@ public class NotesListViewModel extends AndroidViewModel {
                 activeSource.removeObserver(dataObserver);
             }
             activeSource = repository.searchNotes(query);
+            activeSource.observeForever(dataObserver);
+        });
+    }
+
+    public void filterByNoteIds(List<Long> noteIds) {
+        mainHandler.post(() -> {
+            if (activeSource != null) {
+                activeSource.removeObserver(dataObserver);
+            }
+            activeSource = repository.getNotesByIds(noteIds);
             activeSource.observeForever(dataObserver);
         });
     }

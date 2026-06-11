@@ -56,6 +56,11 @@
             android:theme="@style/AppTheme" />
 
         <activity
+            android:name=".ui.TagManagementActivity"
+            android:label="@string/tag_manage"
+            android:theme="@style/AppTheme" />
+
+        <activity
             android:name=".ui.NotesListActivity"
             android:exported="true"
             android:configChanges="keyboardHidden|orientation|screenSize"
